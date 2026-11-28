@@ -50,6 +50,11 @@ jobs:
         run: |
           bash ./gradlew --no-daemon :app:assembleDebug
           test -s app/build/outputs/apk/debug/app-debug.apk
+      - name: Préparer le bundle Android Release non signé
+        working-directory: mobile/android
+        run: |
+          bash ./gradlew --no-daemon :app:bundleRelease
+          test -s app/build/outputs/bundle/release/app-release.aab
 
   ios:
     if: >-
@@ -80,3 +85,10 @@ jobs:
             -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/ios" \
             CODE_SIGNING_ALLOWED=NO build
           test -d "$RUNNER_TEMP/ios/Build/Products/Debug-iphonesimulator/App.app"
+      - name: Compiler iOS Release pour appareil sans signature
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/ios-device" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+          test -d "$RUNNER_TEMP/ios-device/Build/Products/Release-iphoneos/App.app"

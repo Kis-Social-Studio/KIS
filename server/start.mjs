@@ -50,7 +50,7 @@ if (command) {
   const hashes = tag => [...page.matchAll(new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>', 'g'))]
     .map(([, code]) => "'sha256-" + createHash('sha256').update(code).digest('base64') + "'")
     .join(' ');
-  const csp = "default-src 'none'; connect-src 'self'; media-src 'self' blob:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; " +
+  const csp = "default-src 'none'; connect-src 'self'; media-src 'self' blob:; img-src blob:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; " +
     'script-src ' + hashes('script') + '; style-src ' + hashes('style');
   const {KIS_TLS_KEY, KIS_TLS_CERT, KIS_STAGE_USER, KIS_STAGE_PASSWORD} = process.env;
   if (Boolean(KIS_TLS_KEY) !== Boolean(KIS_TLS_CERT)) throw Error('Configurer la clé et le certificat TLS ensemble.');

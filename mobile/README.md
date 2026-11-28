@@ -22,3 +22,17 @@ Les sources et journaux sont soumis à la visibilité du dépôt. Garder les sec
 
 - [Runners standards](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 - [Déclenchement manuel](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+
+## Préparer les paquets signés
+
+La compilation de recette GitHub Actions reste indépendante de la signature. Pour les paquets de distribution, générer et synchroniser les projets depuis le commit validé, puis exécuter le script `mobile/release.sh` sur un runner autorisé. Le répertoire de sortie doit être un nouveau chemin absolu. Le script produit uniquement des fichiers locaux. Ne placer aucune clé ni profil de distribution dans Git. Le projet nécessite encore les visuels de lanceur approuvés, la version commerciale et un numéro de build validés.
+
+- **iOS** — sur un runner macOS autorisé, utiliser un trousseau éphémère avec certificat Apple Distribution et installer le profil App Store correspondant à l’identifiant. Fournir IOS_TEAM_ID, IOS_PROFILE_NAME et IOS_EXPORT_OPTIONS_PLIST dans l’environnement. Le fichier plist doit indiquer `app-store-connect` et une destination `export`. Lancer `bash mobile/release.sh ios /chemin/prive/ios-build`.
+- **Android** — sur un runner autorisé équipé du JDK 21 et du SDK, fournir le keystore de téléversement par ANDROID_UPLOAD_KEYSTORE, son alias par ANDROID_UPLOAD_ALIAS, les deux mots de passe d’environnement ANDROID_UPLOAD_STOREPASS et ANDROID_UPLOAD_KEYPASS, et l’empreinte de la clé de téléversement attendue par ANDROID_UPLOAD_SHA256. Lancer `bash mobile/release.sh android /chemin/prive/android-build`. Le script vérifie l’empreinte du paquet produit.
+
+Les comptes App Store Connect et Play Console, leurs certificats et clés ainsi que l’autorisation de préparer un runner avec ces secrets restent nécessaires. L’import des paquets dans les consoles et leur diffusion sont des opérations séparées.
+
+- [Certificats Apple](https://developer.apple.com/help/account/certificates/certificates-overview/)
+- [Signature Android](https://developer.android.com/studio/publish/app-signing)
+
+La recette automatisée comprend aussi le bundle Android Release non signé et la compilation iOS Release pour appareil générique sans signature. Les vérifications de recette se déroulent sur les runners et ne transfèrent aucun paquet.

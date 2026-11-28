@@ -6,6 +6,7 @@ textarea { display:block; width:100%; font:inherit; }
 form button, #account-session button { margin:.5rem .25rem .25rem 0; }
 #message-list { overflow-wrap:anywhere; }
 #message-list li { white-space:pre-wrap; }
+#moments-gallery img { display:block; max-width:100%; max-height:45vh; margin:.5rem 0; }
 #call-remote { display:block; max-width:100%; max-height:45vh; }
 body.light { color-scheme: light; --bg:#f7f9fc; --text:#101722; --focus:#174b99; }
 body.light h1 { color:#805000; text-shadow:none; }
@@ -29,7 +30,7 @@ details button { margin:.5rem .25rem 0 0; }
 <button data-panel="vibes">KIS Vibes</button>
 <button data-panel="discussions">KIS Discussions</button>
 <button data-panel="york">Kis York</button></nav>
-<details><summary>Entrées du prototype initial</summary><button data-panel="chat">💬 Kis Chat</button><button data-panel="call">▸ Kis Call</button></details><section id="panel" aria-labelledby="heading"><h2 id="heading" tabindex="-1">Accueil</h2><p id="description">Choisissez un module.</p><p id="module-mode"></p></section><section id="preferences" hidden><h2>Paramètres</h2><label><input type="checkbox" id="large"> Texte agrandi</label><label><input type="checkbox" id="classic"> Texte classique</label>
+<details><summary>Entrées du prototype initial</summary><button data-panel="chat">💬 Kis Chat</button><button data-panel="call">▸ Kis Call</button></details><section id="panel" aria-labelledby="heading"><h2 id="heading" tabindex="-1">Accueil</h2><p id="description">Choisissez un module.</p><p id="module-mode"></p><p><a id="module-action" hidden></a></p></section><section id="preferences" hidden><h2>Paramètres</h2><label><input type="checkbox" id="large"> Texte agrandi</label><label><input type="checkbox" id="classic"> Texte classique</label>
 <label for="theme">Apparence</label>
 <select id="theme"><option value="system">Système</option><option value="light">Claire</option><option value="dark">Sombre</option></select>
 <fieldset>
@@ -43,7 +44,7 @@ details button { margin:.5rem .25rem 0 0; }
   <p id="privacy-status" role="status"></p>
 </fieldset>
 <button id="device-lock-setting" type="button" hidden>Activer Face ID ou le code de cet appareil</button><p id="device-lock-status" role="status" hidden></p><h3>Super Sécurité</h3><p>Les comptes de prétest utilisent le même socle de protection. Les contacts doivent être approuvés avant tout échange.</p><h3>Kis Verified</h3><p>Identité, Confiance, Excellence — certifications non actives.</p><button id="close">Fermer les paramètres</button></section><section aria-labelledby="account-heading">
-  <h2 id="account-heading">Compte et messagerie</h2>
+  <h2 id="account-heading" tabindex="-1">Compte et messagerie</h2>
   <p id="account-status" role="status"></p>
   <form id="account-form">
     <label for="handle">Identifiant</label>
@@ -64,7 +65,7 @@ details button { margin:.5rem .25rem 0 0; }
       <label><input id="consent-music" type="checkbox"> Autoriser l’envoi volontaire d’un extrait à Kis York</label>
       <button type="submit">Enregistrer mes consentements</button>
     </form>
-    <h3>Messagerie entre contacts approuvés</h3>
+    <h3 id="discussions-heading" tabindex="-1">Messagerie entre contacts approuvés</h3>
     <p id="message-notice" role="status"></p>
     <button type="button" id="contacts-refresh">Actualiser les contacts</button>
     <label for="peer">Contact</label>
@@ -73,7 +74,7 @@ details button { margin:.5rem .25rem 0 0; }
     <button type="button" id="block-peer" disabled>Bloquer ce contact</button>
     <button type="button" id="older-messages" hidden>Messages précédents</button>
     <section aria-labelledby="call-heading">
-      <h4 id="call-heading">Appels audio et vidéo</h4>
+      <h4 id="call-heading" tabindex="-1">Appels audio et vidéo</h4>
       <p id="call-status" role="status"></p>
       <button id="call-audio" type="button" disabled>Lancer un appel audio</button>
       <button id="call-video" type="button" disabled>Lancer un appel vidéo</button>
@@ -93,7 +94,7 @@ details button { margin:.5rem .25rem 0 0; }
   </div>
 </section>
 <section id="social-feed" aria-labelledby="social-heading" hidden>
-  <h2 id="social-heading">Publications KIS Social</h2>
+  <h2 id="social-heading" tabindex="-1">Publications KIS Social</h2>
   <p id="social-status" role="status"></p>
   <div id="social-session" hidden>
     <form id="social-form">
@@ -110,8 +111,44 @@ details button { margin:.5rem .25rem 0 0; }
     <ol id="social-posts" aria-label="Publications"></ol>
   </div>
 </section>
+<section id="personal-module" aria-labelledby="personal-heading" hidden>
+  <h2 id="personal-heading"></h2>
+  <p id="personal-status" role="status"></p>
+  <div id="pulse-tools" hidden>
+    <form id="pulse-form">
+      <label for="pulse-mood">Votre humeur</label>
+      <select id="pulse-mood"><option>Calme</option><option>En forme</option><option>Fatigué</option><option>Préoccupé</option></select>
+      <label for="pulse-note">Note personnelle</label>
+      <textarea id="pulse-note" maxlength="280"></textarea>
+      <button type="submit">Ajouter au journal de cette session</button>
+    </form>
+    <ol id="pulse-log" aria-label="Journal Pulse"></ol>
+  </div>
+  <div id="moments-tools" hidden>
+    <label for="moments-files">Choisir jusqu’à quatre photos de 8 Mo chacune</label>
+    <input id="moments-files" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+    <div id="moments-gallery" aria-label="Photos de cette session"></div>
+    <button id="moments-clear" type="button" hidden>Fermer les aperçus</button>
+  </div>
+  <div id="vibes-tools" hidden>
+    <label for="vibes-file">Choisir un fichier audio de 30 Mo maximum</label>
+    <input id="vibes-file" type="file" accept="audio/*">
+    <audio id="vibes-player" aria-label="Lecteur audio Vibes" controls preload="metadata" hidden></audio>
+  </div>
+  <div id="flash-tools" hidden>
+    <form id="flash-form">
+      <label for="flash-text">Brouillon privé éphémère</label>
+      <textarea id="flash-text" maxlength="280" required></textarea>
+      <label for="flash-duration">Durée de conservation</label>
+      <select id="flash-duration"><option value="60">1 minute</option><option value="300">5 minutes</option></select>
+      <button type="submit">Afficher mon Flash</button>
+    </form>
+    <p id="flash-preview" aria-label="Flash actif"></p>
+    <button id="flash-dismiss" type="button" hidden>Masquer ce Flash</button>
+  </div>
+</section>
 <section id="york-recognition" aria-labelledby="york-heading" hidden>
-<h2 id="york-heading">Reconnaissance Kis York</h2>
+<h2 id="york-heading" tabindex="-1">Reconnaissance Kis York</h2>
 <p>Vous pouvez enregistrer jusqu’à dix secondes de son. L’extrait est transmis au service Kis York après votre consentement. Ce studio ne conserve pas d’historique de recherche.</p>
 <button id="start-york" type="button" disabled>Reconnaître un morceau</button>
 <button id="cancel-york" type="button" hidden>Annuler l’enregistrement</button>
@@ -128,12 +165,12 @@ details button { margin:.5rem .25rem 0 0; }
 
 const modules = {
   social: ['Kis Social', 'Fil social et publications.'],
-  moments: ['Kis Moments', 'Photos, vidéos et albums.'],
-  pulse: ['KIS Pulse', 'Module à connecter.'],
-  video: ['KIS Vidéo', 'Module à connecter.'],
-  flash: ['KIS Flash', 'Module à connecter.'],
-  vibes: ['KIS Vibes', 'Module à connecter.'],
-  discussions: ['KIS Discussions', 'Module à connecter.'],
+  moments: ['Kis Moments', 'Galerie privée de cette session.'],
+  pulse: ['KIS Pulse', 'Journal de cette session.'],
+  video: ['KIS Vidéo', 'Appels audio et vidéo entre contacts adultes approuvés.'],
+  flash: ['KIS Flash', 'Brouillons privés à durée limitée.'],
+  vibes: ['KIS Vibes', 'Lecteur audio local.'],
+  discussions: ['KIS Discussions', 'Messagerie entre contacts approuvés.'],
   york: ['Kis York', 'Reconnaissance musicale avec consentement et compte adulte attesté.'],
   chat: ['Kis Chat', 'Messagerie, vidéo et messages éphémères : services à connecter.'],
   call: ['Kis Call', 'Appels vidéo et chat pendant les appels : services à connecter.']
@@ -280,6 +317,8 @@ el('theme').addEventListener('change', event => {
 document.querySelectorAll('[data-panel]').forEach(button => {
   button.addEventListener('click', () => {
     currentModule = button.dataset.panel;
+    showPersonalModule(currentModule);
+    renderModuleAction();
     el('social-feed').hidden = currentModule !== 'social';
     if (currentModule === 'social') void refreshSocial();
     el('york-recognition').hidden = currentModule !== 'york';
@@ -338,6 +377,7 @@ function showAccount(account) {
   authVersion++;
   threadVersion++;
   signedIn = Boolean(account);
+  renderModuleAction();
   confirmedPrivacy = account?.privacy ?? null;
   messageCursor = null;
   el('social-posts').replaceChildren();
@@ -348,6 +388,7 @@ function showAccount(account) {
   if (signedIn && currentModule === 'social') void refreshSocial();
   el('message-notice').textContent = '';
   cancelYork();
+  resetPersonalSession();
   closeMedia();
   pendingCall = null;
   renderSafety(account?.safety);
@@ -805,6 +846,150 @@ document.addEventListener('visibilitychange',() => {
   if (document.hidden && mediaCall) void endMedia('Appel arrêté en arrière-plan.');
 });
 
+const personalModules = {
+  pulse: ['Journal Pulse','Vos notes restent dans cet onglet jusqu’à sa fermeture.'],
+  moments: ['Galerie Moments','Les images s’affichent sur cet appareil et ne sont pas envoyées.'],
+  vibes: ['Lecteur Vibes','Lisez un fichier audio de votre appareil sans créer d’historique.'],
+  flash: ['Flash personnel','Le brouillon disparaît à l’expiration ou quand vous quittez Flash.']
+};
+const pulseEntries = [];
+let momentUrls = [];
+let vibeUrl = '';
+let flashTimer;
+
+function resetPersonalSession() {
+  pulseEntries.length = 0;
+  el('pulse-log').replaceChildren();
+  el('pulse-note').value = '';
+  closeMoments();
+  closeVibes();
+  closeFlash();
+}
+function closeMoments() {
+  for (const url of momentUrls) URL.revokeObjectURL(url);
+  momentUrls = [];
+  el('moments-gallery').replaceChildren();
+  el('moments-files').value = '';
+  el('moments-clear').hidden = true;
+}
+function closeVibes() {
+  const player = el('vibes-player');
+  if (vibeUrl) {
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+    URL.revokeObjectURL(vibeUrl);
+    vibeUrl = '';
+  }
+  player.hidden = true;
+  el('vibes-file').value = '';
+}
+function closeFlash() {
+  clearTimeout(flashTimer);
+  el('flash-preview').textContent = '';
+  el('flash-text').value = '';
+  el('flash-dismiss').hidden = true;
+}
+function showPersonalModule(id) {
+  if (id !== 'moments') closeMoments();
+  if (id !== 'vibes') closeVibes();
+  if (id !== 'flash') closeFlash();
+  const selected = Object.hasOwn(personalModules,id);
+  el('personal-module').hidden = !selected;
+  for (const entry of Object.keys(personalModules)) el(entry + '-tools').hidden = entry !== id;
+  if (selected) {
+    el('personal-heading').textContent = personalModules[id][0];
+    el('personal-status').textContent = personalModules[id][1];
+  }
+}
+el('pulse-form').addEventListener('submit',event => {
+  event.preventDefault();
+  const mood = el('pulse-mood').value;
+  const note = el('pulse-note');
+  pulseEntries.unshift(mood + (note.value.trim() ? ' — ' + note.value.trim() : ''));
+  if (pulseEntries.length > 12) pulseEntries.pop();
+  el('pulse-log').replaceChildren(...pulseEntries.map(text => {
+    const item = document.createElement('li');
+    item.textContent = text;
+    return item;
+  }));
+  note.value = '';
+  el('personal-status').textContent = 'Entrée ajoutée au journal de cette session.';
+});
+el('moments-files').addEventListener('change',event => {
+  const files = [...event.target.files];
+  closeMoments();
+  if (!files.length) return;
+  if (files.length > 4 || files.some(file => !['image/jpeg','image/png','image/webp'].includes(file.type) ||
+    file.size === 0 || file.size > 8*1024*1024)) {
+    el('personal-status').textContent = 'Choisissez jusqu’à quatre images JPEG, PNG ou WebP de 8 Mo maximum.';
+    return;
+  }
+  el('moments-gallery').replaceChildren(...files.map((file,index) => {
+    const url = URL.createObjectURL(file);
+    momentUrls.push(url);
+    const image = document.createElement('img');
+    image.src = url;
+    image.alt = 'Photo ' + (index + 1) + ' sélectionnée sur cet appareil';
+    image.addEventListener('error',() => {
+      if (momentUrls.includes(url)) el('personal-status').textContent = 'Une photo ne peut pas être affichée.';
+    });
+    return image;
+  }));
+  el('moments-clear').hidden = false;
+  el('personal-status').textContent = files.length + ' photo(s) ouvertes localement.';
+});
+el('moments-clear').addEventListener('click',() => {
+  closeMoments();
+  el('moments-files').focus();
+  el('personal-status').textContent = 'Aperçus fermés.';
+});
+el('vibes-file').addEventListener('change',event => {
+  const file = event.target.files[0];
+  closeVibes();
+  if (!file) return;
+  if (!file.type.startsWith('audio/') || file.size === 0 || file.size > 30*1024*1024) {
+    el('personal-status').textContent = 'Choisissez un fichier audio de 30 Mo maximum.';
+    return;
+  }
+  const player = el('vibes-player');
+  vibeUrl = URL.createObjectURL(file);
+  player.src = vibeUrl;
+  player.hidden = false;
+  el('personal-status').textContent = 'Fichier chargé. Utilisez le bouton Lecture.';
+});
+el('vibes-player').addEventListener('error',() => {
+  if (vibeUrl) el('personal-status').textContent = 'Ce format audio ne peut pas être lu.';
+});
+el('flash-form').addEventListener('submit',event => {
+  event.preventDefault();
+  const text = el('flash-text').value.trim();
+  if (!text) return;
+  const duration = el('flash-duration').value === '300' ? 300 : 60;
+  closeFlash();
+  el('flash-preview').textContent = text;
+  el('flash-dismiss').hidden = false;
+  el('personal-status').textContent = 'Flash privé actif pendant ' + (duration/60) + ' minute(s).';
+  flashTimer = setTimeout(() => {
+    closeFlash();
+    el('personal-status').textContent = 'Le Flash a expiré.';
+  },duration*1000);
+});
+el('flash-dismiss').addEventListener('click',() => {
+  closeFlash();
+  el('flash-text').focus();
+  el('personal-status').textContent = 'Flash masqué.';
+});
+document.addEventListener('visibilitychange',() => {
+  if (document.hidden) {
+    closeMoments();
+    closeVibes();
+    closeFlash();
+  }
+});
+window.addEventListener('pagehide',resetPersonalSession);
+
+
 const nativeBridge = window.Capacitor;
 const deviceLockKey = 'kis-native-device-lock-v1';
 const lockPanel = el('native-lock');
@@ -815,6 +1000,7 @@ function setLocked(locked) {
   lockPanel.hidden = !locked;
   document.querySelector('main').hidden = locked;
   if (locked) {
+    resetPersonalSession();
     cancelYork();
     if (mediaCall) void endMedia('Appel arrêté : application verrouillée.');
     el('unlock-device').focus();
@@ -931,6 +1117,29 @@ el('social-form').addEventListener('submit',async event => {
   } finally {
     if (submit) submit.disabled = false;
   }
+});
+
+function renderModuleAction() {
+  const actions = {
+    social:['social-heading','Accéder aux publications'],
+    discussions:signedIn ? ['discussions-heading','Accéder à la messagerie'] : ['account-heading','Accéder au compte'],
+    video:signedIn ? ['call-heading','Accéder aux appels'] : ['account-heading','Accéder au compte'],
+    york:['york-heading','Accéder à la reconnaissance musicale']
+  };
+  const action = actions[currentModule];
+  const link = el('module-action');
+  link.hidden = !action;
+  if (action) {
+    link.href = '#' + action[0];
+    link.textContent = action[1];
+  }
+}
+el('module-action').addEventListener('click',event => {
+  const target = el(event.currentTarget.hash.slice(1));
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView({block:'nearest'});
+  target.focus({preventScroll:true});
 });
 
 renderTheme();

@@ -47,3 +47,7 @@ Sur l’hôte de recette, servir chaque studio sous un nom d’hôte distinct. K
 ## Fil KIS Social
 
 Le fil textuel sert à enregistrer des publications personnelles et à partager avec les contacts adultes approuvés, si les deux comptes sont adultes attestés et ont consenti aux échanges. Le mode Ultra privé masque le partage avec les contacts. Les mineurs et les comptes en attente d’attestation peuvent uniquement utiliser leur espace personnel. Les publications sont chiffrées au repos. Un retrait masque le contenu du fil et conserve une trace en base pour l’opérateur. Les signalements sont consultables localement avec `node server/start.mjs list-social-reports`.
+
+## Modules personnels de recette
+
+Pulse propose un journal de session. Moments affiche jusqu’à quatre images sélectionnées sur l’appareil. Vibes ouvre un fichier audio local. Flash affiche un brouillon privé pendant une ou cinq minutes. Les notes de session, fichiers et brouillons de ces quatre modules ne sont pas envoyés au serveur. Fermer l’onglet ou changer de compte réinitialise l’espace. En quittant Moments, Vibes ou Flash, les aperçus et contenus de ces modules sont libérés. Les quatre modules devront être comparés aux maquettes et aux spécifications validées avant distribution.

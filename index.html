@@ -1,1 +1,189 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KIS Social Studio</title><style>body{margin:0;background:#101722;color:white;font:18px system-ui}main{max-width:680px;margin:auto;padding:20px}h1{font-size:64px;color:#ffdf38;font-style:italic;margin:12px 0;text-shadow:4px 4px #d92739}header{border-bottom:5px solid #1688dc}nav{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}button{font:inherit;font-weight:bold;min-height:56px;padding:12px;border:2px solid #fff;border-radius:14px;background:#075da8;color:white;cursor:pointer}button:focus-visible{outline:4px solid #ffdf38;outline-offset:3px}nav button:nth-child(2){background:#a51d30}nav button:nth-child(3){background:#ffdf38;color:#111}section{margin-top:24px;padding:16px;border:1px solid #8295a9;border-radius:16px}label{display:block;margin:12px 0}input{font:inherit}body.large{font-size:23px}body.classic h1{font-style:normal;text-shadow:none}small{display:block;margin:16px 0} [hidden]{display:none!important}</style></head><body><main><header><h1>Kis ★</h1><p>Signature Kisangani Excellence</p><button id="settings">⚙ Paramètres</button></header><small>Prototype local — aucun compte ni échange réel.</small><nav aria-label="Modules"><button data-panel="social">👥 Kis Social</button><button data-panel="chat">💬 Kis Chat</button><button data-panel="moments">▣ Kis Moments</button><button data-panel="call">▸ Kis Call</button></nav><section id="panel" aria-live="polite"><h2 id="heading">Accueil</h2><p id="description">Choisissez un module.</p></section><section id="preferences" hidden><h2>Paramètres</h2><label><input type="checkbox" id="large"> Texte agrandi</label><label><input type="checkbox" id="classic"> Texte classique</label><h3>Super Sécurité</h3><p>Protections à implémenter et vérifier.</p><h3>Kis Verified</h3><p>Identité, Confiance, Excellence — certifications non actives.</p><button id="close">Fermer les paramètres</button></section></main><script>'use strict';const modules={social:['Kis Social','Fil social et publications : service à connecter.'],chat:['Kis Chat','Messagerie, vidéo et messages éphémères : services à connecter.'],moments:['Kis Moments','Photos, vidéos et albums : service à connecter.'],call:['Kis Call','Appels vidéo et chat pendant les appels : services à connecter.']};const el=id=>document.getElementById(id);document.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',()=>{const m=modules[b.dataset.panel];el('heading').textContent=m[0];el('description').textContent=m[1];el('preferences').hidden=true;}));el('settings').addEventListener('click',()=>{el('preferences').hidden=false;el('large').focus()});el('close').addEventListener('click',()=>{el('preferences').hidden=true;el('settings').focus()});for(const id of ['large','classic'])el(id).addEventListener('change',()=>document.body.classList.toggle(id,el(id).checked));</script></body></html>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KIS Social Studio</title><style>body{margin:0;background:#101722;color:white;font:18px system-ui}main{max-width:680px;margin:auto;padding:20px}h1{font-size:64px;color:#ffdf38;font-style:italic;margin:12px 0;text-shadow:4px 4px #d92739}header{border-bottom:5px solid #1688dc}nav{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}button{font:inherit;font-weight:bold;min-height:56px;padding:12px;border:2px solid #fff;border-radius:14px;background:#075da8;color:white;cursor:pointer}button:focus-visible{outline:4px solid #ffdf38;outline-offset:3px}nav button:nth-child(2){background:#a51d30}nav button:nth-child(3){background:#ffdf38;color:#111}section{margin-top:24px;padding:16px;border:1px solid #8295a9;border-radius:16px}label{display:block;margin:12px 0}input{font:inherit}body.large{font-size:23px}body.classic h1{font-style:normal;text-shadow:none}small{display:block;margin:16px 0} [hidden]{display:none!important}
+:root { color-scheme: dark; --bg:#101722; --text:#fff; --focus:#ffdf38; }
+body { background:var(--bg); color:var(--text); }
+body.light { color-scheme: light; --bg:#f7f9fc; --text:#101722; --focus:#174b99; }
+body.light h1 { color:#805000; text-shadow:none; }
+body.system { color-scheme: light dark; }
+@media (prefers-color-scheme: light) {
+  body.system h1 { color:#805000; text-shadow:none; }
+  body.system { --bg:#f7f9fc; --text:#101722; --focus:#174b99; }
+}
+button { border-color:currentColor; overflow-wrap:anywhere; }
+:focus-visible, button:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
+select { font:inherit; max-width:100%; }
+fieldset { min-width:0; margin:1rem 0; }
+#privacy-options label { display:flex; align-items:baseline; gap:.6rem; min-height:2rem; }
+details { margin-top:1rem; }
+details button { margin:.5rem .25rem 0 0; }
+@media (max-width:380px) { nav { grid-template-columns:1fr; } }
+</style></head><body><main><header><h1>Kis ★</h1><p>Signature Kisangani Excellence</p><button id="settings">⚙ Paramètres</button></header><small>Prototype local — aucun compte ni échange réel.</small><nav aria-label="Modules"><button data-panel="social">👥 Kis Social</button><button data-panel="moments">▣ Kis Moments</button>
+<button data-panel="pulse">KIS Pulse</button>
+<button data-panel="video">KIS Vidéo</button>
+<button data-panel="flash">KIS Flash</button>
+<button data-panel="vibes">KIS Vibes</button>
+<button data-panel="discussions">KIS Discussions</button>
+<button data-panel="york">Kis York</button></nav>
+<details><summary>Entrées du prototype initial</summary><button data-panel="chat">💬 Kis Chat</button><button data-panel="call">▸ Kis Call</button></details><section id="panel" aria-labelledby="heading"><h2 id="heading" tabindex="-1">Accueil</h2><p id="description">Choisissez un module.</p><p id="module-mode"></p></section><section id="preferences" hidden><h2>Paramètres</h2><label><input type="checkbox" id="large"> Texte agrandi</label><label><input type="checkbox" id="classic"> Texte classique</label>
+<label for="theme">Apparence</label>
+<select id="theme"><option value="system">Système</option><option value="light">Claire</option><option value="dark">Sombre</option></select>
+<fieldset>
+  <legend>Confidentialité des modules</legend>
+  <label for="privacy-mode">Mode commun aux huit modules</label>
+  <select id="privacy-mode" aria-describedby="privacy-help">
+    <option value="public">Public</option><option value="private">Privé</option><option value="ultra">Ultra privé</option>
+  </select>
+  <p id="privacy-help">Préconfiguration locale. Les restrictions du mode et le socle mineurs restent cochés. Le prototype ne contient ni compte ni échange réel. Le verrouillage Face ID ou code nécessite une intégration native.</p>
+  <div id="privacy-options"></div>
+  <p id="privacy-status" role="status"></p>
+</fieldset>
+<h3>Super Sécurité</h3><p>Protections à implémenter et vérifier.</p><h3>Kis Verified</h3><p>Identité, Confiance, Excellence — certifications non actives.</p><button id="close">Fermer les paramètres</button></section></main><script>
+'use strict';
+
+const modules = {
+  social: ['Kis Social', 'Fil social et publications.'],
+  moments: ['Kis Moments', 'Photos, vidéos et albums.'],
+  pulse: ['KIS Pulse', 'Module à connecter.'],
+  video: ['KIS Vidéo', 'Module à connecter.'],
+  flash: ['KIS Flash', 'Module à connecter.'],
+  vibes: ['KIS Vibes', 'Module à connecter.'],
+  discussions: ['KIS Discussions', 'Module à connecter.'],
+  york: ['Kis York', 'Le lecteur historique est disponible séparément.'],
+  chat: ['Kis Chat', 'Messagerie, vidéo et messages éphémères : services à connecter.'],
+  call: ['Kis Call', 'Appels vidéo et chat pendant les appels : services à connecter.']
+};
+
+const options = {
+  profile: 'Masquer le profil aux inconnus.',
+  online: 'Masquer le statut en ligne.',
+  lastSeen: 'Masquer la dernière connexion.',
+  receipts: 'Masquer les confirmations de lecture.',
+  location: 'Masquer la localisation.',
+  invites: 'Empêcher les invitations d’inconnus.',
+  contacts: 'Masquer les abonnements et contacts.',
+  recommendations: 'Désactiver les recommandations du profil.',
+  notifications: 'Masquer le contenu des notifications.',
+  deviceLock: 'Verrouiller les modules par Face ID ou code.',
+  sharing: 'Limiter le partage des publications.',
+  musicHistory: 'Masquer l’historique musical.'
+};
+
+const minorBaseline = ['profile', 'location', 'invites', 'contacts', 'recommendations', 'sharing'];
+const requiredByMode = {
+  public: [],
+  private: ['online', 'lastSeen', 'notifications'],
+  ultra: Object.keys(options)
+};
+const modeNames = {public: 'Public', private: 'Privé', ultra: 'Ultra privé'};
+const storageKey = 'kis-studio-privacy-v1';
+const themes = ['system', 'light', 'dark'];
+const el = id => document.getElementById(id);
+
+function readSettings() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(storageKey));
+    if (stored && typeof stored.mode === 'string' && Object.hasOwn(modeNames, stored.mode)) {
+      const extra = Object.keys(options).filter(key =>
+        Array.isArray(stored.extra) && stored.extra.includes(key));
+      return {mode: stored.mode, extra, theme: themes.includes(stored.theme) ? stored.theme : 'system'};
+    }
+  } catch {
+    // Corrupt or blocked storage uses the same conservative defaults as a new session.
+  }
+  return {mode: 'private', extra: [], theme: 'system'};
+}
+
+const settings = readSettings();
+const optionControls = new Map();
+let currentModule = null;
+
+function saveSettings() {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(settings));
+    el('privacy-status').textContent = 'Préférences enregistrées sur cet appareil.';
+  } catch {
+    el('privacy-status').textContent = 'Préférences appliquées pour cette session. Stockage indisponible.';
+  }
+}
+
+function renderPrivacy() {
+  const mandatory = new Set([...minorBaseline, ...requiredByMode[settings.mode]]);
+  el('privacy-mode').value = settings.mode;
+  for (const [key, {input, reason}] of optionControls) {
+    input.checked = mandatory.has(key) || settings.extra.includes(key);
+    input.disabled = mandatory.has(key);
+    reason.textContent = minorBaseline.includes(key) ? ' (socle mineurs)' :
+      mandatory.has(key) ? ' (requis par le mode)' : '';
+  }
+  el('module-mode').textContent = currentModule ? 'Mode sélectionné : ' + modeNames[settings.mode] : '';
+}
+
+for (const [key, text] of Object.entries(options)) {
+  const label = document.createElement('label');
+  const input = document.createElement('input');
+  const caption = document.createElement('span');
+  const reason = document.createElement('span');
+  input.type = 'checkbox';
+  input.name = key;
+  caption.append(text, reason);
+  label.append(input, caption);
+  el('privacy-options').append(label);
+  optionControls.set(key, {input, reason});
+  input.addEventListener('change', () => {
+    if (input.disabled) return;
+    settings.extra = settings.extra.filter(option => option !== key);
+    if (input.checked) settings.extra.push(key);
+    renderPrivacy();
+    saveSettings();
+  });
+}
+
+function renderTheme() {
+  document.body.classList.toggle('system', settings.theme === 'system');
+  document.body.classList.toggle('light', settings.theme === 'light');
+  el('theme').value = settings.theme;
+}
+
+el('privacy-mode').addEventListener('change', event => {
+  if (!Object.hasOwn(modeNames, event.target.value)) return;
+  settings.mode = event.target.value;
+  renderPrivacy();
+  saveSettings();
+});
+el('theme').addEventListener('change', event => {
+  if (!themes.includes(event.target.value)) return;
+  settings.theme = event.target.value;
+  renderTheme();
+  saveSettings();
+});
+
+document.querySelectorAll('[data-panel]').forEach(button => {
+  button.addEventListener('click', () => {
+    currentModule = button.dataset.panel;
+    const [title, description] = modules[currentModule];
+    el('heading').textContent = title;
+    el('description').textContent = description;
+    el('preferences').hidden = true;
+    el('settings').setAttribute('aria-expanded', 'false');
+    renderPrivacy();
+    el('heading').focus();
+  });
+});
+
+el('settings').setAttribute('aria-controls', 'preferences');
+el('settings').setAttribute('aria-expanded', 'false');
+el('settings').addEventListener('click', () => {
+  el('preferences').hidden = false;
+  el('settings').setAttribute('aria-expanded', 'true');
+  el('large').focus();
+});
+el('close').addEventListener('click', () => {
+  el('preferences').hidden = true;
+  el('settings').setAttribute('aria-expanded', 'false');
+  el('settings').focus();
+});
+for (const id of ['large', 'classic']) {
+  el(id).addEventListener('change', () => document.body.classList.toggle(id, el(id).checked));
+}
+renderTheme();
+renderPrivacy();
+</script></body></html>

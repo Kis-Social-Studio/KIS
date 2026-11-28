@@ -21,7 +21,7 @@ const {host} = new URL(origin);
 const data = resolve(process.env.KIS_DATA ?? join(homedir(), '.kis-data'));
 mkdirSync(data, {recursive: true, mode: 0o700});
 const service = openService({
-  filename:join(data,'kis.sqlite'),origin,keyHex:process.env.KIS_DATA_KEY,
+  filename:join(data,'kis.sqlite'),origin,keyHex:process.env.KIS_DATA_KEY,backupKey:process.env.KIS_BACKUP_KEY,
   recognize:createRecognizer(process.env.KIS_MUSIC_TOKEN),
   turnUrl:process.env.KIS_TURN_URL,turnSecret:process.env.KIS_TURN_SECRET
 });
@@ -35,10 +35,12 @@ if (command) {
     } else if (command === 'attest-age' && left && right && (!guardian || guardian === 'guardian-approved')) {
       service.attestAge(left,right,Boolean(guardian));
       console.log('Attestation enregistrée. Le compte doit confirmer ses consentements.');
+    } else if (command === 'list-social-reports' && !left) {
+      console.log(JSON.stringify(service.listSocialReports(),null,2));
     } else if (command === 'list-reports' && !left) {
       console.log(JSON.stringify(service.listReports(), null, 2));
     } else {
-      throw Error('Commandes : approve-contact A B, attest-age compte adult|minor|unknown [guardian-approved], list-reports');
+      throw Error('Commandes : approve-contact A B, attest-age compte adult|minor|unknown [guardian-approved], list-reports, list-social-reports');
     }
   } finally {
     service.close();
@@ -52,10 +54,11 @@ if (command) {
     'script-src ' + hashes('script') + '; style-src ' + hashes('style');
   const {KIS_TLS_KEY, KIS_TLS_CERT, KIS_STAGE_USER, KIS_STAGE_PASSWORD} = process.env;
   if (Boolean(KIS_TLS_KEY) !== Boolean(KIS_TLS_CERT)) throw Error('Configurer la clé et le certificat TLS ensemble.');
-  if (KIS_TLS_KEY && (!origin.startsWith('https:') || !KIS_STAGE_USER || !KIS_STAGE_PASSWORD || KIS_STAGE_PASSWORD.length < 20)) {
+  const privateStage = Boolean(KIS_TLS_KEY) || process.env.KIS_TLS_TERMINATED_PROXY === '1';
+  if (privateStage && (!origin.startsWith('https:') || !KIS_STAGE_USER || !KIS_STAGE_PASSWORD || KIS_STAGE_PASSWORD.length < 20)) {
     throw Error('Origine HTTPS et accès de préproduction requis.');
   }
-  const credentials = KIS_TLS_KEY && 'Basic ' + Buffer.from(KIS_STAGE_USER + ':' + KIS_STAGE_PASSWORD).toString('base64');
+  const credentials = privateStage && 'Basic ' + Buffer.from(KIS_STAGE_USER + ':' + KIS_STAGE_PASSWORD).toString('base64');
   const options = {requestTimeout:15_000,headersTimeout:10_000};
   const serve = async (req,res) => {
     res.setHeader('content-security-policy', csp);

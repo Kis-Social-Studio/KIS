@@ -69,7 +69,7 @@ function json(value, status = 200, headers = {}) {
   });
 }
 
-export function openService({filename, origin, keyHex, recognize, turnUrl, turnSecret, now = Date.now, maxAuthPerMinute = 24}) {
+export function openService({filename, origin, keyHex, backupKey, recognize, turnUrl, turnSecret, now = Date.now, maxAuthPerMinute = 24}) {
   const url = new URL(origin);
   ensure(url.origin === origin && (url.protocol === 'https:' ||
     (url.protocol === 'http:' && url.hostname === '127.0.0.1')), 500, 'Origine HTTPS ou locale requise.');
@@ -117,6 +117,17 @@ export function openService({filename, origin, keyHex, recognize, turnUrl, turnS
     );
     CREATE INDEX IF NOT EXISTS messages_thread ON messages(sender,recipient,id);
     CREATE INDEX IF NOT EXISTS messages_recipient ON messages(recipient,id);
+    CREATE TABLE IF NOT EXISTS social_posts (
+      id INTEGER PRIMARY KEY, author INTEGER NOT NULL REFERENCES accounts(id),
+      text TEXT NOT NULL, created INTEGER NOT NULL,
+      audience TEXT NOT NULL CHECK(audience IN ('self','contacts')),
+      withdrawn INTEGER NOT NULL DEFAULT 0 CHECK(withdrawn IN (0,1))
+    );
+    CREATE INDEX IF NOT EXISTS social_author ON social_posts(author,id);
+    CREATE TABLE IF NOT EXISTS social_reports (
+      reporter INTEGER NOT NULL REFERENCES accounts(id), post INTEGER NOT NULL REFERENCES social_posts(id),
+      created INTEGER NOT NULL, PRIMARY KEY(reporter,post)
+    );
     CREATE TABLE IF NOT EXISTS reports (
       reporter INTEGER NOT NULL REFERENCES accounts(id), message INTEGER NOT NULL REFERENCES messages(id),
       created INTEGER NOT NULL, PRIMARY KEY(reporter,message)
@@ -124,7 +135,7 @@ export function openService({filename, origin, keyHex, recognize, turnUrl, turnS
   `);
   let encryption;
   try {
-    encryption = prepareEncryption(db,keyHex,filename);
+    encryption = prepareEncryption(db,keyHex,filename,backupKey);
   } catch (error) {
     db.close();
     throw error;
@@ -201,6 +212,16 @@ export function openService({filename, origin, keyHex, recognize, turnUrl, turnS
   }
   function allowed(a, b) {
     return permitsCommunication(a,b) && approval.get(...pair(a,b)) && !blockExists.get(a,b,b,a);
+  }
+  function canSharePost(account) {
+    const safety = safetyFor(account.id);
+    return account.mode !== 'ultra' && safety.age === 'adult' && safety.communications;
+  }
+  function canReadPost(viewer,row) {
+    if (row.withdrawn) return false;
+    if (row.author === viewer.id) return true;
+    return row.audience === 'contacts' && canSharePost(viewer) &&
+      canSharePost({id:row.author,mode:row.mode}) && Boolean(allowed(viewer.id,row.author));
   }
   function peerFor(me, handle) {
     const peer = byHandle.get(normalize(handle));
@@ -285,6 +306,57 @@ export function openService({filename, origin, keyHex, recognize, turnUrl, turnS
             music=excluded.music,consent_updated=excluded.consent_updated
           `).run(me,Number(communications),Number(music),second());
           return json(safetyFor(me));
+        }
+        case 'GET /api/social': {
+          const rows = q(`
+            SELECT p.*,a.handle,a.mode FROM social_posts p JOIN accounts a ON a.id=p.author
+            WHERE p.withdrawn=0 AND (p.author=? OR (p.audience='contacts' AND EXISTS(
+              SELECT 1 FROM contacts c WHERE (c.low=? AND c.high=p.author) OR (c.high=? AND c.low=p.author)
+            )))
+            ORDER BY p.id DESC LIMIT 300
+          `).all(me,me,me);
+          const posts = rows.filter(row => canReadPost(account,row)).slice(0,50).map(row => ({
+            id:row.id,handle:row.handle,mine:row.author === me,text:encryption.readPost(row),
+            audience:row.author === me ? row.audience : undefined
+          }));
+          return json({posts,sharingAvailable:canSharePost(account)});
+        }
+        case 'POST /api/social': {
+          const {text,audience} = await authenticatedBody();
+          ensure(typeof text === 'string' && text.trim() && text.length <= 1000 &&
+            ['self','contacts'].includes(audience),400,'Publication invalide.');
+          const created = second();
+          db.exec('BEGIN IMMEDIATE');
+          try {
+            const viewer = session.get(digest(token),second());
+            ensure(viewer && (audience === 'self' || canSharePost(viewer)),403,'Partage non autorisé.');
+            const total = q('SELECT COUNT(*) AS total FROM social_posts WHERE author=? AND created>?').get(me,created-3600).total;
+            ensure(total < 10,429,'Trop de publications.');
+            const {lastInsertRowid:id} = q('INSERT INTO social_posts(author,text,created,audience) VALUES(?,?,?,?)')
+              .run(me,'',created,audience);
+            q('UPDATE social_posts SET text=? WHERE id=?').run(encryption.sealPost(id,me,created,text.trim()),id);
+            db.exec('COMMIT');
+            return json({id},201);
+          } catch (error) {
+            db.exec('ROLLBACK');
+            throw error;
+          }
+        }
+        case 'POST /api/social/withdraw': {
+          const {id} = await authenticatedBody();
+          ensure(Number.isSafeInteger(id) &&
+            q('UPDATE social_posts SET withdrawn=1 WHERE id=? AND author=?').run(id,me).changes,404,'Publication indisponible.');
+          return json({});
+        }
+        case 'POST /api/social/report': {
+          const {id} = await authenticatedBody();
+          const row = Number.isSafeInteger(id) && q(`
+            SELECT p.*,a.mode FROM social_posts p JOIN accounts a ON a.id=p.author WHERE p.id=?
+          `).get(id);
+          const viewer = session.get(digest(token),second());
+          ensure(row && row.author !== me && viewer && canReadPost(viewer,row),404,'Publication indisponible.');
+          q('INSERT OR IGNORE INTO social_reports(reporter,post,created) VALUES(?,?,?)').run(me,id,second());
+          return json({},201);
         }
         case 'GET /api/notifications': {
           const after = Number(searchParams.get('after') ?? 0);
@@ -419,5 +491,12 @@ export function openService({filename, origin, keyHex, recognize, turnUrl, turnS
       ORDER BY r.created DESC LIMIT 100
     `).all().map(row => ({id:row.id,reporter:row.reporter,sender:row.senderHandle,text:encryption.readMessage(row),created:row.reported}));
   }
-  return {handle, allowContact, attestAge, listReports, close: () => db.close()};
+  function listSocialReports() {
+    return q(`
+      SELECT p.id,p.author,p.text,p.created,r.created AS reported,a.handle AS reporter,b.handle AS authorHandle
+      FROM social_reports r JOIN social_posts p ON p.id=r.post
+      JOIN accounts a ON a.id=r.reporter JOIN accounts b ON b.id=p.author ORDER BY r.created DESC LIMIT 100
+    `).all().map(row => ({id:row.id,reporter:row.reporter,author:row.authorHandle,text:encryption.readPost(row),created:row.reported}));
+  }
+  return {handle, allowContact, attestAge, listReports, listSocialReports, close: () => db.close()};
 }

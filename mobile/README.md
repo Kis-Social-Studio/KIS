@@ -13,3 +13,12 @@ Sur Safari, ouvrir la préproduction HTTPS KIS depuis deux sessions isolées. Cr
 La coque native embarque l’interface locale. Elle reste à raccorder à une origine HTTPS KIS approuvée pour la messagerie et les comptes, dont l’API exige la même origine. Les huit pictogrammes officiels restent à importer depuis leurs fichiers d’origine.
 
 Le verrouillage local utilise le module natif BiometricAuth. Sur iPhone ou iPad vérifier l’enrôlement, le refus, l’annulation, le code système et le retour depuis l’arrière-plan. Sur Android vérifier la biométrie et le code, avec et sans verrouillage système configuré. Aucun code n’est saisi ni stocké par l’interface web. L’archive contient des projets Debug à compiler sur les postes équipés.
+
+## Compilation GitHub Actions
+
+Le workflow `.github/workflows/native-preflight.yml` définit une compilation Android Debug sur Ubuntu avec JDK 21 et SDK API 36 et une compilation de simulateur sans signature sur macOS 15. Les tâches sont limitées aux runners standards et aux dépôts publics. Elles ne transfèrent aucun artefact et ne consomment aucun secret de signature. Un push ordinaire ne lance aucune compilation. La compilation par push nécessite le marqueur `[native-preflight]` dans le dernier message de commit de `developpement/regroupement`. GitHub exige que le workflow soit présent sur la branche par défaut avant le déclenchement avec `workflow_dispatch`.
+
+Les sources et journaux sont soumis à la visibilité du dépôt. Garder les secrets et les données de test hors des commits. Une compilation réussie précède les tests sur appareils physiques et la signature. Confirmer les paramètres de facturation GitHub avant tout changement de visibilité, de runner ou de stockage des artefacts.
+
+- [Runners standards](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+- [Déclenchement manuel](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)

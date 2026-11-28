@@ -79,6 +79,8 @@ details button { margin:.5rem .25rem 0 0; }
       <button id="call-video" type="button" disabled>Lancer un appel vidéo</button>
       <button id="accept-call" type="button" hidden>Accepter l’appel</button>
       <button id="decline-call" type="button" hidden>Refuser l’appel</button>
+      <button id="mute-call" type="button" aria-pressed="false" hidden>Couper le microphone</button>
+      <button id="pause-camera" type="button" aria-pressed="false" hidden>Couper la caméra</button>
       <button id="end-call" type="button" hidden>Raccrocher</button>
       <video id="call-remote" aria-label="Média reçu" controls playsinline hidden></video>
     </section>
@@ -88,6 +90,24 @@ details button { margin:.5rem .25rem 0 0; }
       <textarea id="message-text" maxlength="2000" required disabled></textarea>
       <button type="submit" id="send-message" disabled>Envoyer</button>
     </form>
+  </div>
+</section>
+<section id="social-feed" aria-labelledby="social-heading" hidden>
+  <h2 id="social-heading">Publications KIS Social</h2>
+  <p id="social-status" role="status"></p>
+  <div id="social-session" hidden>
+    <form id="social-form">
+      <label for="social-text">Texte de la publication</label>
+      <textarea id="social-text" required maxlength="1000"></textarea>
+      <label for="social-audience">Audience</label>
+      <select id="social-audience">
+        <option value="self">Moi uniquement</option>
+        <option value="contacts">Mes contacts adultes approuvés</option>
+      </select>
+      <button type="submit">Enregistrer la publication</button>
+    </form>
+    <button id="social-refresh" type="button">Actualiser le fil</button>
+    <ol id="social-posts" aria-label="Publications"></ol>
   </div>
 </section>
 <section id="york-recognition" aria-labelledby="york-heading" hidden>
@@ -179,6 +199,7 @@ async function savePrivacy() {
     const result = await api('privacy', 'PUT', {mode: settings.mode, requested});
     if (version !== authVersion) return;
     confirmedPrivacy = result;
+    if (currentModule === 'social') void refreshSocial();
     settings.mode = result.mode;
     settings.extra = result.requested;
     el('privacy-status').textContent = 'Réglages du compte enregistrés.';
@@ -259,6 +280,8 @@ el('theme').addEventListener('change', event => {
 document.querySelectorAll('[data-panel]').forEach(button => {
   button.addEventListener('click', () => {
     currentModule = button.dataset.panel;
+    el('social-feed').hidden = currentModule !== 'social';
+    if (currentModule === 'social') void refreshSocial();
     el('york-recognition').hidden = currentModule !== 'york';
     if (currentModule !== 'york') cancelYork();
     else if (signedIn) void act(el('start-york'), refreshSafety);
@@ -317,6 +340,12 @@ function showAccount(account) {
   signedIn = Boolean(account);
   confirmedPrivacy = account?.privacy ?? null;
   messageCursor = null;
+  el('social-posts').replaceChildren();
+  el('social-text').value = '';
+  el('social-audience').value = 'self';
+  el('social-session').hidden = !signedIn;
+  if (!signedIn) el('social-status').textContent = 'Connectez-vous pour utiliser le fil.';
+  if (signedIn && currentModule === 'social') void refreshSocial();
   el('message-notice').textContent = '';
   cancelYork();
   closeMedia();
@@ -577,6 +606,8 @@ let mediaCall = null;
 let mediaEpoch = 0;
 let polling = false;
 let pendingCall = null;
+let lastCallUpdate = 0;
+const callTrackControls = {audio:'mute-call', video:'pause-camera'};
 
 function closeMedia() {
   mediaEpoch++;
@@ -588,6 +619,10 @@ function closeMedia() {
   el('call-remote').srcObject = null;
   el('call-remote').hidden = true;
   el('end-call').hidden = true;
+  for (const id of Object.values(callTrackControls)) {
+    el(id).hidden = true;
+    el(id).setAttribute('aria-pressed','false');
+  }
 }
 
 function setCallNotice(text) {
@@ -602,6 +637,7 @@ async function pollCalls() {
   try {
     const {available,call} = await api('calls');
     if (version !== authVersion) return;
+    lastCallUpdate = Date.now();
     const canCall = el('consent-chat').checked &&
       el('age-status').dataset.group === 'adult' && Boolean(el('peer').value);
     for (const id of ['call-audio','call-video']) el(id).disabled = !available || !canCall || Boolean(call || mediaCall);
@@ -652,6 +688,7 @@ async function startMedia(kind, incoming) {
   const peer = incoming?.from ?? el('peer').value;
   const state = {id:incoming?.id,connection:null,stream:null};
   mediaCall = state;
+  lastCallUpdate = Date.now();
   el('end-call').hidden = false;
   el('accept-call').hidden = true;
   el('decline-call').hidden = true;
@@ -666,6 +703,13 @@ async function startMedia(kind, incoming) {
       return;
     }
     state.stream = stream;
+    for (const track of stream.getTracks()) {
+      const control = el(callTrackControls[track.kind]);
+      if (control) {
+        control.hidden = false;
+        control.textContent = track.kind === 'audio' ? 'Couper le microphone' : 'Couper la caméra';
+      }
+    }
     const connection = new RTCPeerConnection(configuration);
     state.connection = connection;
     for (const track of stream.getTracks()) connection.addTrack(track,stream);
@@ -741,7 +785,22 @@ async function checkMessages() {
     checkingMessages = false;
   }
 }
-setInterval(() => { void pollCalls(); void checkMessages(); },3000);
+for (const [kind,id] of Object.entries(callTrackControls)) {
+  el(id).addEventListener('click',() => {
+    const tracks = mediaCall?.stream?.getTracks().filter(track => track.kind === kind) ?? [];
+    if (!tracks.length) return;
+    const mute = tracks.some(track => track.enabled);
+    for (const track of tracks) track.enabled = !mute;
+    el(id).setAttribute('aria-pressed',String(mute));
+    const device = kind === 'audio' ? 'le microphone' : 'la caméra';
+    el(id).textContent = (mute ? 'Rétablir ' : 'Couper ') + device;
+  });
+}
+setInterval(() => {
+  if (mediaCall && Date.now()-lastCallUpdate > 12_000) void endMedia('Appel arrêté : signalisation indisponible.');
+  void pollCalls();
+  void checkMessages();
+},3000);
 document.addEventListener('visibilitychange',() => {
   if (document.hidden && mediaCall) void endMedia('Appel arrêté en arrière-plan.');
 });
@@ -812,6 +871,67 @@ if (nativeBridge?.isNativePlatform?.() && typeof nativeBridge.nativePromise === 
   });
   document.addEventListener('visibilitychange',() => { if (localLock && document.hidden) setLocked(true); });
 }
+
+async function refreshSocial() {
+  if (!signedIn) {
+    el('social-status').textContent = 'Connectez-vous pour utiliser le fil.';
+    return;
+  }
+  const version = authVersion;
+  try {
+    const {posts,sharingAvailable} = await api('social');
+    if (version !== authVersion) return;
+    const audience = el('social-audience');
+    audience.options[1].disabled = !sharingAvailable;
+    if (!sharingAvailable) audience.value = 'self';
+    el('social-session').hidden = false;
+    const items = posts.map(post => {
+      const item = document.createElement('li');
+      item.textContent = (post.mine ? 'Vous' : post.handle) + ' — ' + post.text;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = post.mine ? 'Retirer du fil' : 'Signaler';
+      button.addEventListener('click',async () => {
+        if (button.disabled) return;
+        button.disabled = true;
+        try {
+          await api('social/' + (post.mine ? 'withdraw' : 'report'),'POST',{id:post.id});
+          await refreshSocial();
+          el('social-status').textContent = post.mine ? 'Publication retirée.' : 'Signalement enregistré.';
+        } catch (error) {
+          el('social-status').textContent = error.message;
+          button.disabled = false;
+        }
+      });
+      item.append(' ',button);
+      return item;
+    });
+    el('social-posts').replaceChildren(...items);
+    el('social-status').textContent = posts.length ? '' : 'Aucune publication visible.';
+  } catch (error) {
+    if (version === authVersion) el('social-status').textContent = error.message;
+  }
+}
+el('social-refresh').addEventListener('click',() => void refreshSocial());
+el('social-form').addEventListener('submit',async event => {
+  event.preventDefault();
+  const submit = event.submitter;
+  if (submit?.disabled) return;
+  if (submit) submit.disabled = true;
+  const input = el('social-text');
+  const text = input.value;
+  try {
+    await api('social','POST',{text,audience:el('social-audience').value});
+    if (input.value === text) input.value = '';
+    el('social-audience').value = 'self';
+    await refreshSocial();
+    el('social-status').textContent = 'Publication enregistrée.';
+  } catch (error) {
+    el('social-status').textContent = error.message;
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+});
 
 renderTheme();
 renderPrivacy();

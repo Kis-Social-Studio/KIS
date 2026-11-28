@@ -1,6 +1,9 @@
 import {createCipheriv, createDecipheriv, randomBytes, randomUUID} from 'node:crypto';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {dirname,join,resolve} from 'node:path';
+import {sealBackup} from './backup.mjs';
 
-export function prepareEncryption(db, keyHex, filename) {
+export function prepareEncryption(db, keyHex, filename, backupKey) {
   if (typeof keyHex !== 'string' || !/^[0-9a-f]{64}$/i.test(keyHex)) {
     throw Error('KIS_DATA_KEY doit contenir 32 octets aléatoires en hexadécimal.');
   }
@@ -32,8 +35,18 @@ export function prepareEncryption(db, keyHex, filename) {
   }
   db.exec('PRAGMA secure_delete=ON');
   if (!verify.get() && filename !== ':memory:' && q('SELECT 1 FROM messages LIMIT 1').get()) {
-    const backup = filename + '.avant-chiffrement-' + randomUUID() + '.sqlite';
-    q('VACUUM INTO ?').run(backup);
+    if (typeof backupKey !== 'string' || !/^[0-9a-f]{64}$/i.test(backupKey) || backupKey.toLowerCase() === keyHex.toLowerCase()) {
+      throw Error('Une clé KIS_BACKUP_KEY valide et distincte est requise avant la migration.');
+    }
+    const backup = filename + '.avant-chiffrement-' + randomUUID() + '.kisb';
+    const directory = mkdtempSync(join(dirname(resolve(filename)),'.kis-migration-'));
+    try {
+      const temporary = join(directory,'snapshot.sqlite');
+      q('VACUUM INTO ?').run(temporary);
+      sealBackup(temporary,backup,backupKey);
+    } finally {
+      rmSync(directory,{recursive:true});
+    }
   }
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -42,8 +55,13 @@ export function prepareEncryption(db, keyHex, filename) {
       verifyKey(existing);
     } else {
       const update = q('UPDATE messages SET text=? WHERE id=?');
-      for (const row of q('SELECT id,sender,recipient,created,text FROM messages').all()) {
-        update.run(seal(row.text,aad(row.id,row.sender,row.recipient,row.created)),row.id);
+      const batch = q('SELECT id,sender,recipient,created,text FROM messages WHERE id>? ORDER BY id LIMIT 500');
+      let last = Number.MIN_SAFE_INTEGER;
+      for (;;) {
+        const rows = batch.all(last);
+        if (!rows.length) break;
+        for (const row of rows) update.run(seal(row.text,aad(row.id,row.sender,row.recipient,row.created)),row.id);
+        last = rows.at(-1).id;
       }
       q('INSERT INTO encryption_meta(id,sealed) VALUES(1,?)').run(seal('kis-v1','kis:key-check:v1'));
     }
@@ -55,6 +73,8 @@ export function prepareEncryption(db, keyHex, filename) {
   db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
   return {
     sealMessage: (id,sender,recipient,created,text) => seal(text,aad(id,sender,recipient,created)),
-    readMessage: row => unseal(row.text,aad(row.id,row.sender,row.recipient,row.created))
+    readMessage: row => unseal(row.text,aad(row.id,row.sender,row.recipient,row.created)),
+    sealPost: (id,author,created,text) => seal(text,`kis:post:v1:${id}:${author}:${created}`),
+    readPost: row => unseal(row.text,`kis:post:v1:${row.id}:${row.author}:${row.created}`)
   };
 }

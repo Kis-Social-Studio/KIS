@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import {existsSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {test} from 'node:test';
+import {restoreBackup,sealBackup,verifyBackup} from './backup.mjs';
+
+test('archive privée, restauration fidèle et aucun écrasement', t => {
+  const dir = mkdtempSync(join(tmpdir(),'kis-archive-test-'));
+  t.after(() => rmSync(dir,{recursive:true}));
+  const source = join(dir,'original');
+  const archive = join(dir,'copy.kisb');
+  const destination = join(dir,'restored');
+  const data = Buffer.from('Message fictif ancien : protégez cet exemple.\n'.repeat(24_000));
+  const secret = 'a0'.repeat(32);
+  writeFileSync(source,data,{mode:0o644});
+  sealBackup(source,archive,secret,{restrictSource:true});
+  assert.equal(statSync(archive).mode & 0o777,0o600);
+  assert.equal(statSync(source).mode & 0o777,0o600);
+  assert.deepEqual(readFileSync(source),data);
+  assert.equal(readFileSync(archive).includes(data.subarray(0,64)),false);
+  verifyBackup(archive,secret);
+  restoreBackup(archive,destination,secret);
+  assert.deepEqual(readFileSync(destination),data);
+  assert.equal(statSync(destination).mode & 0o777,0o600);
+  assert.throws(() => sealBackup(source,archive,secret),{code:'EEXIST'});
+  assert.throws(() => restoreBackup(archive,destination,secret),{code:'EEXIST'});
+  assert.throws(() => verifyBackup(archive,'b1'.repeat(32)));
+  const corrupt = join(dir,'modified.kisb');
+  const bytes = readFileSync(archive);
+  bytes[120] ^= 1;
+  writeFileSync(corrupt,bytes);
+  assert.throws(() => restoreBackup(corrupt,join(dir,'bad'),secret));
+  assert.equal(existsSync(join(dir,'bad')),false);
+  const symlink = join(dir,'link');
+  symlinkSync(source,symlink);
+  assert.throws(() => sealBackup(symlink,join(dir,'from-link'),secret),{code:'ELOOP'});
+});

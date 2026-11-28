@@ -57,3 +57,7 @@ Pulse propose un journal de session. Moments affiche jusqu’à quatre images s�
 Le navigateur réutilise l’identifiant d’un envoi non confirmé tant que le texte, le destinataire et la session restent identiques. Le serveur enregistre l’identifiant et le message chiffré dans la même transaction. Un nouvel envoi portant le même identifiant peut récupérer le résultat initial si le contact est toujours autorisé. Un contenu différent avec le même identifiant est refusé. Les anciens clients sans identifiant restent compatibles.
 
 - [Recette iPhone et iPad](../mobile/recette-iphone-ipad.md)
+
+Kis York ne demande pas le microphone tant que le service est indisponible ou que l’autorisation du compte manque. Le retrait du consentement et la fermeture de la connexion interrompent la demande en cours. Une attestation modifiée par un processus opérateur distinct est revérifiée avant qu’un résultat soit rendu. Une transmission déjà effectuée vers le prestataire ne peut pas être rappelée.
+
+- [Procédure de déblocage](../mobile/deblocage-lotus-kis.md)

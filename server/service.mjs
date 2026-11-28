@@ -159,6 +159,11 @@ export function openService({filename, origin, keyHex, backupKey, recognize, tur
   let authActive = 0;
   let musicActive = 0;
   const musicQuota = new Map();
+  const musicRequests = new Map();
+  function stopMusic(id, sessionHash) {
+    const pending = musicRequests.get(id);
+    if (pending && (!sessionHash || pending.sessionHash === sessionHash)) pending.controller.abort();
+  }
   const cookie = (token, age) => `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}` +
     (url.protocol === 'https:' ? '; Secure' : '');
 
@@ -173,7 +178,8 @@ export function openService({filename, origin, keyHex, backupKey, recognize, tur
       age: row?.age ?? 'unknown',
       guardian: Boolean(row?.guardian),
       communications: Boolean(row?.communications),
-      music: Boolean(row?.music)
+      music: Boolean(row?.music),
+      musicAvailable: Boolean(recognize)
     };
   }
   function permitsCommunication(a, b) {
@@ -189,6 +195,7 @@ export function openService({filename, origin, keyHex, backupKey, recognize, tur
     const account = byHandle.get(normalize(handle));
     ensure(account && ['adult','minor','unknown'].includes(age) && (!guardian || age === 'minor'),
       400, 'Attestation invalide.');
+    stopMusic(account.id);
     q(`
       INSERT INTO safety(account,age,guardian,attested,attestation) VALUES(?,?,?,?,?)
       ON CONFLICT(account) DO UPDATE SET age=excluded.age,guardian=excluded.guardian,
@@ -293,6 +300,7 @@ export function openService({filename, origin, keyHex, backupKey, recognize, tur
       };
       switch (route) {
         case 'POST /api/logout':
+          stopMusic(me,digest(token));
           q('DELETE FROM sessions WHERE token=?').run(digest(token));
           return json({}, 200, {'set-cookie': cookie('', 0)});
         case 'GET /api/me':
@@ -309,6 +317,7 @@ export function openService({filename, origin, keyHex, backupKey, recognize, tur
             ON CONFLICT(account) DO UPDATE SET communications=excluded.communications,
             music=excluded.music,consent_updated=excluded.consent_updated
           `).run(me,Number(communications),Number(music),second());
+          if (!music) stopMusic(me);
           return json(safetyFor(me));
         }
         case 'GET /api/social': {
@@ -401,14 +410,30 @@ export function openService({filename, origin, keyHex, backupKey, recognize, tur
           ensure(session.get(digest(token),second()) && current.age === 'adult' && current.music,403,'Consentement musical requis.');
           const stamp = second();
           for (const [id, time] of musicQuota) if (time <= stamp-60) musicQuota.delete(id);
-          ensure(!musicQuota.has(me) && musicActive < 2,429,'Réessayez dans un instant.');
+          ensure(!musicQuota.has(me) && !musicRequests.has(me) && musicActive < 2,429,'Réessayez dans un instant.');
           musicQuota.set(me,stamp);
           musicActive++;
+          const controller = new AbortController();
+          const sessionHash = digest(token);
+          musicRequests.set(me,{controller,sessionHash});
+          const isAllowed = () => {
+            const latest = safetyFor(me);
+            return session.get(sessionHash,second()) && latest.age === 'adult' && latest.music;
+          };
           try {
-            return json(await recognize(clip,mime,request.signal));
+            if (!isAllowed() || request.signal.aborted) return json({error:'Reconnaissance interrompue.'},403);
+            const answer = await recognize(clip,mime,AbortSignal.any([request.signal,controller.signal]));
+            if (!isAllowed() || controller.signal.aborted || request.signal.aborted) {
+              return json({error:'Reconnaissance interrompue.'},403);
+            }
+            return json(answer);
           } catch {
+            if (controller.signal.aborted || request.signal.aborted || !isAllowed()) {
+              return json({error:'Reconnaissance interrompue.'},403);
+            }
             throw new HttpError(502,'Service de reconnaissance indisponible.');
           } finally {
+            musicRequests.delete(me);
             musicActive--;
           }
         }

@@ -63,6 +63,7 @@ if (command) {
   const serve = async (req,res) => {
     res.setHeader('content-security-policy', csp);
     res.setHeader('referrer-policy', 'no-referrer');
+    res.setHeader('permissions-policy','camera=(self), microphone=(self), geolocation=()');
     res.setHeader('x-content-type-options', 'nosniff');
     res.setHeader('cache-control', 'no-store');
     if (req.headers.host !== host || !req.url?.startsWith('/') || req.url.startsWith('//')) {
@@ -86,14 +87,17 @@ if (command) {
       res.writeHead(413, {'connection': 'close'}).end();
       return;
     }
+    const connection = new AbortController();
+    res.once('close',() => { if (!res.writableEnded) connection.abort(); });
     try {
       const hasBody = !['GET', 'HEAD'].includes(req.method);
       const address = new URL(req.url, origin);
       const request = new Request(address, {
-        method: req.method, headers: req.headers,
+        method: req.method, headers: req.headers, signal:connection.signal,
         ...(hasBody ? {body: Readable.toWeb(req), duplex: 'half'} : {})
       });
       const response = await service.handle(request);
+      if (res.destroyed) return;
       res.writeHead(response.status, Object.fromEntries(response.headers));
       res.end(await response.text());
     } catch (error) {

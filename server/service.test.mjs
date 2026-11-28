@@ -240,3 +240,32 @@ test('Kis York et appels relayés, éligibilité et retraits de consentement', a
   await call('block',{method:'POST',cookie:b,data:{peer:'alice'}});
   assert.equal((await call('calls',{cookie:a})).result.call,null);
 });
+
+test('retirer le consentement interrompt la reconnaissance en cours',async t => {
+  let started;
+  const begin = new Promise(resolve => { started=resolve; });
+  const service = openService({filename:':memory:',keyHex,origin,recognize:(_clip,_mime,signal)=>{
+    return new Promise((resolve,reject)=>{
+      signal.addEventListener('abort',()=>reject(signal.reason),{once:true});
+      started(signal);
+    });
+  }});
+  t.after(()=>service.close());
+  const call = (path,method,data,cookie,type='application/json') => service.handle(new Request(origin+'/api/'+path,{
+    method,headers:{origin,'content-type':type,...(cookie?{cookie}:{})},
+    body:data === undefined ? undefined : type === 'application/json' ? JSON.stringify(data) : data
+  }));
+  const register = await call('register','POST',{handle:'pretest',password});
+  assert.equal(register.status,201);
+  const cookie = register.headers.get('set-cookie').split(';')[0];
+  service.attestAge('pretest','adult');
+  assert.equal((await call('consent','PUT',{communications:false,music:true},cookie)).status,200);
+  const safety = (await (await call('me','GET',undefined,cookie)).json()).safety;
+  assert.equal(safety.musicAvailable,true);
+  const pending = call('music/identify','POST','extrait-fictif',cookie,'audio/webm');
+  const signal = await begin;
+  assert.equal((await call('consent','PUT',{communications:false,music:false},cookie)).status,200);
+  assert.equal(signal.aborted,true);
+  assert.equal((await pending).status,403);
+  assert.equal((await call('music/identify','POST','extrait-fictif',cookie,'audio/webm')).status,403);
+});

@@ -547,7 +547,15 @@ function renderSafety(safety) {
   el('consent-chat').checked = Boolean(safety?.communications);
   el('consent-music').disabled = safety?.age !== 'adult';
   el('consent-music').checked = Boolean(safety?.music);
-  musicAllowed = safety?.age === 'adult' && safety.music;
+  musicAllowed = safety?.age === 'adult' && safety.music && safety.musicAvailable;
+  if (!capture && !musicAllowed) {
+    el('york-status').textContent = !safety ? 'Connectez-vous pour utiliser Kis York.' :
+      safety.age !== 'adult' ? 'Reconnaissance réservée aux comptes adultes attestés.' :
+      !safety.musicAvailable ? 'Le service Kis York doit être configuré.' :
+      'Autorisez la reconnaissance dans vos consentements.';
+  } else if (!capture) {
+    el('york-status').textContent = '';
+  }
   el('start-york').disabled = !musicAllowed || Boolean(capture);
   if (!musicAllowed) cancelYork();
 }

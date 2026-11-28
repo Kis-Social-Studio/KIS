@@ -1,0 +1,21 @@
+{
+  "name": "kis-studio-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prepare:web": "node prepare-web.mjs",
+    "native:init": "npm run prepare:web && cap add ios && node set-ios-target.mjs && cap add android",
+    "native:sync": "npm run prepare:web && cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.3",
+    "@capacitor/core": "8.6.3",
+    "@capacitor/ios": "8.6.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.3"
+  }
+}

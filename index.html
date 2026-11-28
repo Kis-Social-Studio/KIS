@@ -1,6 +1,11 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KIS Social Studio</title><style>body{margin:0;background:#101722;color:white;font:18px system-ui}main{max-width:680px;margin:auto;padding:20px}h1{font-size:64px;color:#ffdf38;font-style:italic;margin:12px 0;text-shadow:4px 4px #d92739}header{border-bottom:5px solid #1688dc}nav{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}button{font:inherit;font-weight:bold;min-height:56px;padding:12px;border:2px solid #fff;border-radius:14px;background:#075da8;color:white;cursor:pointer}button:focus-visible{outline:4px solid #ffdf38;outline-offset:3px}nav button:nth-child(2){background:#a51d30}nav button:nth-child(3){background:#ffdf38;color:#111}section{margin-top:24px;padding:16px;border:1px solid #8295a9;border-radius:16px}label{display:block;margin:12px 0}input{font:inherit}body.large{font-size:23px}body.classic h1{font-style:normal;text-shadow:none}small{display:block;margin:16px 0} [hidden]{display:none!important}
 :root { color-scheme: dark; --bg:#101722; --text:#fff; --focus:#ffdf38; }
 body { background:var(--bg); color:var(--text); }
+input, textarea, select { max-width:100%; box-sizing:border-box; }
+textarea { display:block; width:100%; font:inherit; }
+form button, #account-session button { margin:.5rem .25rem .25rem 0; }
+#message-list { overflow-wrap:anywhere; }
+#message-list li { white-space:pre-wrap; }
 body.light { color-scheme: light; --bg:#f7f9fc; --text:#101722; --focus:#174b99; }
 body.light h1 { color:#805000; text-shadow:none; }
 body.system { color-scheme: light dark; }
@@ -16,7 +21,7 @@ fieldset { min-width:0; margin:1rem 0; }
 details { margin-top:1rem; }
 details button { margin:.5rem .25rem 0 0; }
 @media (max-width:380px) { nav { grid-template-columns:1fr; } }
-</style></head><body><main><header><h1>Kis ★</h1><p>Signature Kisangani Excellence</p><button id="settings">⚙ Paramètres</button></header><small>Prototype local — aucun compte ni échange réel.</small><nav aria-label="Modules"><button data-panel="social">👥 Kis Social</button><button data-panel="moments">▣ Kis Moments</button>
+</style></head><body><main><header><h1>Kis ★</h1><p>Signature Kisangani Excellence</p><button id="settings">⚙ Paramètres</button></header><small>La messagerie nécessite le serveur KIS et un contact approuvé.</small><nav aria-label="Modules"><button data-panel="social">👥 Kis Social</button><button data-panel="moments">▣ Kis Moments</button>
 <button data-panel="pulse">KIS Pulse</button>
 <button data-panel="video">KIS Vidéo</button>
 <button data-panel="flash">KIS Flash</button>
@@ -32,11 +37,41 @@ details button { margin:.5rem .25rem 0 0; }
   <select id="privacy-mode" aria-describedby="privacy-help">
     <option value="public">Public</option><option value="private">Privé</option><option value="ultra">Ultra privé</option>
   </select>
-  <p id="privacy-help">Préconfiguration locale. Les restrictions du mode et le socle mineurs restent cochés. Le prototype ne contient ni compte ni échange réel. Le verrouillage Face ID ou code nécessite une intégration native.</p>
+  <p id="privacy-help">Les restrictions du mode et le socle mineurs restent cochés. Les réglages sont associés au compte après connexion. Face ID ou code nécessite une intégration native.</p>
   <div id="privacy-options"></div>
   <p id="privacy-status" role="status"></p>
 </fieldset>
-<h3>Super Sécurité</h3><p>Protections à implémenter et vérifier.</p><h3>Kis Verified</h3><p>Identité, Confiance, Excellence — certifications non actives.</p><button id="close">Fermer les paramètres</button></section></main><script>
+<h3>Super Sécurité</h3><p>Les comptes de prétest utilisent le même socle de protection. Les contacts doivent être approuvés avant tout échange.</p><h3>Kis Verified</h3><p>Identité, Confiance, Excellence — certifications non actives.</p><button id="close">Fermer les paramètres</button></section><section aria-labelledby="account-heading">
+  <h2 id="account-heading">Compte et messagerie</h2>
+  <p id="account-status" role="status"></p>
+  <form id="account-form">
+    <label for="handle">Identifiant</label>
+    <input id="handle" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="handle-help">
+    <p id="handle-help">3 à 24 lettres ASCII, chiffres ou tirets bas.</p>
+    <label for="password">Mot de passe</label>
+    <input id="password" type="password" required minlength="12" maxlength="256" autocomplete="current-password">
+    <button type="submit" value="login">Connexion</button>
+    <button type="submit" value="register">Créer un compte</button>
+  </form>
+  <div id="account-session" hidden>
+    <p>Compte connecté <strong id="account-name"></strong></p>
+    <button type="button" id="logout">Déconnexion</button>
+    <h3>Messagerie entre contacts approuvés</h3>
+    <button type="button" id="contacts-refresh">Actualiser les contacts</button>
+    <label for="peer">Contact</label>
+    <select id="peer"></select>
+    <button type="button" id="read-thread" disabled>Actualiser la conversation</button>
+    <button type="button" id="block-peer" disabled>Bloquer ce contact</button>
+    <button type="button" id="older-messages" hidden>Messages précédents</button>
+    <ol id="message-list" aria-label="Messages"></ol>
+    <form id="send-form">
+      <label for="message-text">Message texte</label>
+      <textarea id="message-text" maxlength="2000" required disabled></textarea>
+      <button type="submit" id="send-message" disabled>Envoyer</button>
+    </form>
+  </div>
+</section>
+</main><script>
 'use strict';
 
 const modules = {
@@ -96,9 +131,42 @@ const settings = readSettings();
 const optionControls = new Map();
 let currentModule = null;
 
+let savingPrivacy = false;
+
+async function savePrivacy() {
+  if (!signedIn) {
+    saveSettings();
+    return;
+  }
+  const version = authVersion;
+  const requested = [...settings.extra];
+  savingPrivacy = true;
+  el('privacy-mode').disabled = true;
+  renderPrivacy();
+  try {
+    const result = await api('privacy', 'PUT', {mode: settings.mode, requested});
+    if (version !== authVersion) return;
+    confirmedPrivacy = result;
+    settings.mode = result.mode;
+    settings.extra = result.requested;
+    el('privacy-status').textContent = 'Réglages du compte enregistrés.';
+  } catch {
+    if (version === authVersion && confirmedPrivacy) {
+      settings.mode = confirmedPrivacy.mode;
+      settings.extra = confirmedPrivacy.requested;
+      el('privacy-status').textContent = 'Enregistrement non confirmé. Derniers réglages connus affichés.';
+    }
+  } finally {
+    savingPrivacy = false;
+    el('privacy-mode').disabled = false;
+    renderPrivacy();
+  }
+}
+
 function saveSettings() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify(settings));
+    const local = signedIn ? {...readSettings(), theme: settings.theme} : settings;
+    localStorage.setItem(storageKey, JSON.stringify(local));
     el('privacy-status').textContent = 'Préférences enregistrées sur cet appareil.';
   } catch {
     el('privacy-status').textContent = 'Préférences appliquées pour cette session. Stockage indisponible.';
@@ -110,7 +178,7 @@ function renderPrivacy() {
   el('privacy-mode').value = settings.mode;
   for (const [key, {input, reason}] of optionControls) {
     input.checked = mandatory.has(key) || settings.extra.includes(key);
-    input.disabled = mandatory.has(key);
+    input.disabled = mandatory.has(key) || savingPrivacy;
     reason.textContent = minorBaseline.includes(key) ? ' (socle mineurs)' :
       mandatory.has(key) ? ' (requis par le mode)' : '';
   }
@@ -133,7 +201,7 @@ for (const [key, text] of Object.entries(options)) {
     settings.extra = settings.extra.filter(option => option !== key);
     if (input.checked) settings.extra.push(key);
     renderPrivacy();
-    saveSettings();
+    void savePrivacy();
   });
 }
 
@@ -144,10 +212,10 @@ function renderTheme() {
 }
 
 el('privacy-mode').addEventListener('change', event => {
-  if (!Object.hasOwn(modeNames, event.target.value)) return;
+  if (savingPrivacy || !Object.hasOwn(modeNames, event.target.value)) return;
   settings.mode = event.target.value;
   renderPrivacy();
-  saveSettings();
+  void savePrivacy();
 });
 el('theme').addEventListener('change', event => {
   if (!themes.includes(event.target.value)) return;
@@ -184,6 +252,170 @@ el('close').addEventListener('click', () => {
 for (const id of ['large', 'classic']) {
   el(id).addEventListener('change', () => document.body.classList.toggle(id, el(id).checked));
 }
+const accountStatus = el('account-status');
+let signedIn = false;
+let confirmedPrivacy = null;
+let authVersion = 0;
+let threadVersion = 0;
+
+async function api(path, method = 'GET', payload) {
+  const response = await fetch('/api/' + path, {
+    method, credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(10000),
+    ...(payload ? {headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {})
+  });
+  if (!response.headers.get('content-type')?.startsWith('application/json')) {
+    throw Error('Le serveur KIS doit servir cette page pour activer les comptes.');
+  }
+  const result = await response.json();
+  if (!response.ok) {
+    if (response.status === 401 && signedIn) showAccount(null);
+    const error = Error(result.error);
+    error.status = response.status;
+    throw error;
+  }
+  return result;
+}
+
+function showAccount(account) {
+  authVersion++;
+  threadVersion++;
+  signedIn = Boolean(account);
+  confirmedPrivacy = account?.privacy ?? null;
+  el('account-form').hidden = signedIn;
+  el('account-session').hidden = !signedIn;
+  el('account-name').textContent = account?.handle ?? '';
+  el('message-list').replaceChildren();
+  el('peer').replaceChildren();
+  el('message-text').value = '';
+  if (account) {
+    settings.mode = account.privacy.mode;
+    settings.extra = account.privacy.requested;
+  } else {
+    const local = readSettings();
+    settings.mode = local.mode;
+    settings.extra = local.extra;
+  }
+  renderPrivacy();
+}
+
+async function refreshContacts() {
+  const version = authVersion;
+  const peers = await api('contacts');
+  if (version !== authVersion) return;
+  const select = el('peer');
+  const current = select.value;
+  select.replaceChildren(...peers.map(handle => new Option(handle, handle)));
+  if (peers.includes(current)) select.value = current;
+  for (const id of ['read-thread', 'block-peer', 'message-text', 'send-message']) {
+    el(id).disabled = peers.length === 0;
+  }
+  await loadThread();
+}
+
+async function loadThread(before) {
+  const version = ++threadVersion;
+  const peer = el('peer').value;
+  const list = el('message-list');
+  if (!before) list.replaceChildren();
+  el('older-messages').hidden = true;
+  if (!peer) return;
+  const query = new URLSearchParams({peer});
+  if (before) query.set('before', before);
+  const {messages, next} = await api('messages?' + query);
+  if (version !== threadVersion) return;
+  const items = messages.map(message => {
+    const item = document.createElement('li');
+    item.textContent = (message.mine ? 'Vous' : peer) + ' — ' + message.text;
+    if (!message.mine) {
+      const report = document.createElement('button');
+      report.type = 'button';
+      report.textContent = 'Signaler';
+      report.setAttribute('aria-label', 'Signaler le message ' + message.id);
+      report.addEventListener('click', () => act(report, async () => {
+        await api('report', 'POST', {message: message.id});
+        accountStatus.textContent = 'Signalement enregistré.';
+      }));
+      item.append(' ', report);
+    }
+    return item;
+  });
+  list.prepend(...items);
+  el('older-messages').hidden = !next;
+  el('older-messages').dataset.before = next ?? '';
+}
+
+async function act(control, operation) {
+  if (control.getAttribute('aria-busy') === 'true') return;
+  control.setAttribute('aria-busy', 'true');
+  try {
+    await operation();
+  } catch (error) {
+    accountStatus.textContent = error.message || 'Service KIS indisponible.';
+  } finally {
+    control.removeAttribute('aria-busy');
+  }
+}
+
+el('account-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const {submitter} = event;
+  const form = event.currentTarget;
+  void act(form, async () => {
+    const account = await api(submitter?.value === 'register' ? 'register' : 'login', 'POST', {
+      handle: el('handle').value, password: el('password').value
+    });
+    form.reset();
+    showAccount(account);
+    el('logout').focus();
+    accountStatus.textContent = 'Compte connecté.';
+    await refreshContacts();
+  });
+});
+el('logout').addEventListener('click', event => void act(event.currentTarget, async () => {
+  await api('logout', 'POST');
+  showAccount(null);
+  el('handle').focus();
+  accountStatus.textContent = 'Session fermée.';
+}));
+el('peer').addEventListener('change', event => void act(event.currentTarget, () => loadThread()));
+el('contacts-refresh').addEventListener('click', event => void act(event.currentTarget, refreshContacts));
+el('read-thread').addEventListener('click', event => void act(event.currentTarget, () => loadThread()));
+el('older-messages').addEventListener('click', event => {
+  const button = event.currentTarget;
+  void act(button, () => loadThread(button.dataset.before));
+});
+el('send-form').addEventListener('submit', event => {
+  event.preventDefault();
+  void act(event.currentTarget, async () => {
+    const message = el('message-text');
+    const sent = message.value;
+    await api('messages', 'POST', {peer: el('peer').value, text: sent});
+    if (message.value === sent) message.value = '';
+    accountStatus.textContent = 'Message envoyé.';
+    await loadThread();
+  });
+});
+el('block-peer').addEventListener('click', event => void act(event.currentTarget, async () => {
+  await api('block', 'POST', {peer: el('peer').value});
+  accountStatus.textContent = 'Contact bloqué.';
+  await refreshContacts();
+}));
+
 renderTheme();
 renderPrivacy();
+
+const versionAtStart = authVersion;
+if (['http:', 'https:'].includes(location.protocol)) {
+  api('me').then(account => {
+    if (authVersion !== versionAtStart) return;
+    showAccount(account);
+    return refreshContacts();
+  }).catch(error => {
+    if (authVersion === versionAtStart && error.status !== 401) {
+      accountStatus.textContent = error.message;
+    }
+  });
+} else {
+  accountStatus.textContent = 'Le serveur KIS est nécessaire pour activer les comptes.';
+}
 </script></body></html>

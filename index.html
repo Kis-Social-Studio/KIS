@@ -353,6 +353,7 @@ const accountStatus = el('account-status');
 let signedIn = false;
 let confirmedPrivacy = null;
 let authVersion = 0;
+let pendingMessage = null;
 let threadVersion = 0;
 
 async function api(path, method = 'GET', payload) {
@@ -375,6 +376,7 @@ async function api(path, method = 'GET', payload) {
 
 function showAccount(account) {
   authVersion++;
+  pendingMessage = null;
   threadVersion++;
   signedIn = Boolean(account);
   renderModuleAction();
@@ -505,9 +507,24 @@ el('send-form').addEventListener('submit', event => {
   event.preventDefault();
   void act(event.currentTarget, async () => {
     const message = el('message-text');
-    const sent = message.value;
-    await api('messages', 'POST', {peer: el('peer').value, text: sent});
-    if (message.value === sent) message.value = '';
+    const version = authVersion;
+    const peer = el('peer').value;
+    const text = message.value;
+    if (!pendingMessage || pendingMessage.peer !== peer || pendingMessage.text !== text) {
+      pendingMessage = {peer,text,requestId:crypto.randomUUID()};
+    }
+    const request = pendingMessage;
+    try {
+      await api('messages','POST',request);
+    } catch (error) {
+      if (version === authVersion) {
+        accountStatus.textContent = error.message + ' Le brouillon reste disponible pour réessayer.';
+      }
+      return;
+    }
+    if (version !== authVersion) return;
+    pendingMessage = null;
+    if (message.value === text && el('peer').value === peer) message.value = '';
     accountStatus.textContent = 'Message envoyé.';
     await loadThread();
   });

@@ -20,6 +20,14 @@ if [[ "$platform" == "ios" ]]; then
     echo "Export local App Store Connect requis." >&2
     exit 2
   }
+  bundle_id="$(node -p 'require(process.argv[1]).appId' "$studio/capacitor.config.json")"
+  plist_team="$(plutil -extract teamID raw "$IOS_EXPORT_OPTIONS_PLIST")"
+  profile="$(plutil -extract provisioningProfiles json -o - "$IOS_EXPORT_OPTIONS_PLIST" |
+    node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync(0,"utf8"))[process.argv[1]] || "")' "$bundle_id")"
+  [[ "$plist_team" == "$IOS_TEAM_ID" && "$profile" == "$IOS_PROFILE_NAME" ]] || {
+    echo "Équipe Apple ou profil d’export incohérent avec le studio." >&2
+    exit 2
+  }
   [[ -d "$studio/ios/App/App.xcodeproj" ]]
   mkdir -m 700 "$output"
   cd "$studio/ios/App"
@@ -40,6 +48,14 @@ else
   [[ -f "$studio/android/gradlew" ]]
   command -v jarsigner >/dev/null
   command -v keytool >/dev/null
+  expected="$(printf '%s' "$ANDROID_UPLOAD_SHA256" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+  key_fingerprint="$(keytool -J-Duser.language=en -list -v -alias "$ANDROID_UPLOAD_ALIAS" \
+    -keystore "$ANDROID_UPLOAD_KEYSTORE" -storepass:env ANDROID_UPLOAD_STOREPASS |
+    awk '/SHA256:/ && !found {print $2; found=1}' | tr -d ':')"
+  [[ "$expected" =~ ^[A-F0-9]{64}$ && "$key_fingerprint" == "$expected" ]] || {
+    echo "Empreinte de la clé Android inattendue. Aucune compilation lancée." >&2
+    exit 2
+  }
   mkdir -m 700 "$output"
   cd "$studio/android"
   bash ./gradlew --no-daemon :app:bundleRelease
@@ -51,8 +67,7 @@ else
   grep -Fq 'jar verified.' <<< "$verification"
   fingerprint="$(keytool -J-Duser.language=en -printcert -jarfile "$bundle" |
     awk '/SHA256:/ && !found {print $2; found=1}' | tr -d ':')"
-  expected="$(printf '%s' "$ANDROID_UPLOAD_SHA256" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
-  [[ "$expected" =~ ^[A-F0-9]{64}$ && "$fingerprint" == "$expected" ]] || {
+  [[ "$fingerprint" == "$expected" ]] || {
     echo "Empreinte de la signature Android inattendue. Conserver le fichier pour contrôle." >&2
     exit 1
   }

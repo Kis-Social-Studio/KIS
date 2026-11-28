@@ -115,6 +115,10 @@ export function openService({filename, origin, keyHex, backupKey, recognize, tur
       id INTEGER PRIMARY KEY, sender INTEGER NOT NULL REFERENCES accounts(id),
       recipient INTEGER NOT NULL REFERENCES accounts(id), text TEXT NOT NULL, created INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS message_requests (
+      sender INTEGER NOT NULL REFERENCES accounts(id), request TEXT NOT NULL,
+      message INTEGER NOT NULL UNIQUE REFERENCES messages(id), PRIMARY KEY(sender,request)
+    );
     CREATE INDEX IF NOT EXISTS messages_thread ON messages(sender,recipient,id);
     CREATE INDEX IF NOT EXISTS messages_recipient ON messages(recipient,id);
     CREATE TABLE IF NOT EXISTS social_posts (
@@ -439,20 +443,36 @@ export function openService({filename, origin, keyHex, backupKey, recognize, tur
           return json({messages: rows.slice(0,50).reverse().map(row => ({id:row.id,mine:row.mine,text:encryption.readMessage(row),created:row.created})), next: rows.length === 51 ? rows[49].id : null});
         }
         case 'POST /api/messages': {
-          const {peer: handle, text} = await authenticatedBody();
+          const {peer: handle, text, requestId} = await authenticatedBody();
           const peer = peerFor(account, handle);
           ensure(typeof text === 'string' && text.trim() && text.length <= 2000 &&
             !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(text), 400, 'Message invalide.');
-          const recent = q('SELECT COUNT(*) AS total FROM messages WHERE sender=? AND created>?').get(me,second()-60);
-          ensure(recent.total < 20, 429, 'Trop de messages.');
+          ensure(requestId === undefined || (typeof requestId === 'string' &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(requestId)),
+            400,'Identifiant d’envoi invalide.');
           const created = second();
           db.exec('BEGIN IMMEDIATE');
           try {
             ensure(allowed(me,peer.id),404,'Contact indisponible.');
+            if (requestId) {
+              const prior = q(`
+                SELECT m.* FROM message_requests r JOIN messages m ON m.id=r.message
+                WHERE r.sender=? AND r.request=?
+              `).get(me,requestId);
+              if (prior) {
+                ensure(prior.recipient === peer.id && encryption.readMessage(prior) === text.trim(),
+                  409,'Cet identifiant correspond déjà à un autre envoi.');
+                db.exec('COMMIT');
+                return json({id:prior.id},200);
+              }
+            }
+            const recent = q('SELECT COUNT(*) AS total FROM messages WHERE sender=? AND created>?').get(me,created-60);
+            ensure(recent.total < 20,429,'Trop de messages.');
             const {lastInsertRowid:id} = q('INSERT INTO messages(sender,recipient,text,created) VALUES(?,?,?,?)')
               .run(me,peer.id,'',created);
             const sealed = encryption.sealMessage(id,me,peer.id,created,text.trim());
             q('UPDATE messages SET text=? WHERE id=?').run(sealed,id);
+            if (requestId) q('INSERT INTO message_requests(sender,request,message) VALUES(?,?,?)').run(me,requestId,id);
             db.exec('COMMIT');
             return json({id},201);
           } catch (error) {

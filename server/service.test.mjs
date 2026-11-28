@@ -72,7 +72,12 @@ test('comptes, confidentialité, contacts approuvés et messages persistants', a
   service.allowContact('alice','bob');
   assert.deepEqual((await call('contacts', {cookie:alice})).result, ['bob']);
   await call('messages', {method:'POST', cookie:alice, data:{peer:'bob',text:'x'.repeat(9000)}, status:413});
-  const sent = await call('messages', {method:'POST', cookie:alice, data:{peer:'bob',text:'<b>Texte littéral</b>'}, status:201});
+  const message = {peer:'bob',text:'<b>Texte littéral</b>',requestId:'5078ae1a-838a-4106-8f22-89a04f291ee0'};
+  const sent = await call('messages',{method:'POST',cookie:alice,data:message,status:201});
+  const replay = await call('messages',{method:'POST',cookie:alice,data:message});
+  assert.deepEqual(replay.result,sent.result);
+  await call('messages',{method:'POST',cookie:alice,data:{...message,text:'Un autre texte'},status:409});
+  await call('messages',{method:'POST',cookie:alice,data:{...message,requestId:'invalide'},status:400});
   const id = sent.result.id;
   await call('messages?peer=alice', {cookie:other, status:404});
   await call('report', {method:'POST', cookie:other, data:{message:id}, status:404});

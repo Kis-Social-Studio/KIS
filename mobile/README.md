@@ -36,3 +36,7 @@ Les comptes App Store Connect et Play Console, leurs certificats et clés ainsi 
 - [Signature Android](https://developer.android.com/studio/publish/app-signing)
 
 La recette automatisée comprend aussi le bundle Android Release non signé et la compilation iOS Release pour appareil générique sans signature. Les vérifications de recette se déroulent sur les runners et ne transfèrent aucun paquet.
+
+Le fichier d’export Apple doit associer le bon identifiant de studio au profil autorisé et à l’équipe configurée. Android vérifie l’empreinte de la clé avant la compilation puis celle de la signature produite.
+
+- [Recette iPhone et iPad](recette-iphone-ipad.md)

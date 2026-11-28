@@ -51,3 +51,9 @@ Le fil textuel sert à enregistrer des publications personnelles et à partager 
 ## Modules personnels de recette
 
 Pulse propose un journal de session. Moments affiche jusqu’à quatre images sélectionnées sur l’appareil. Vibes ouvre un fichier audio local. Flash affiche un brouillon privé pendant une ou cinq minutes. Les notes de session, fichiers et brouillons de ces quatre modules ne sont pas envoyés au serveur. Fermer l’onglet ou changer de compte réinitialise l’espace. En quittant Moments, Vibes ou Flash, les aperçus et contenus de ces modules sont libérés. Les quatre modules devront être comparés aux maquettes et aux spécifications validées avant distribution.
+
+## Relance des envois de messages
+
+Le navigateur réutilise l’identifiant d’un envoi non confirmé tant que le texte, le destinataire et la session restent identiques. Le serveur enregistre l’identifiant et le message chiffré dans la même transaction. Un nouvel envoi portant le même identifiant peut récupérer le résultat initial si le contact est toujours autorisé. Un contenu différent avec le même identifiant est refusé. Les anciens clients sans identifiant restent compatibles.
+
+- [Recette iPhone et iPad](../mobile/recette-iphone-ipad.md)

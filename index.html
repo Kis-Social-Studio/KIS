@@ -1,4 +1,4 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KIS Social Studio</title><style>body{margin:0;background:#101722;color:white;font:18px system-ui}main{max-width:680px;margin:auto;padding:20px}h1{font-size:64px;color:#ffdf38;font-style:italic;margin:12px 0;text-shadow:4px 4px #d92739}header{border-bottom:5px solid #1688dc}nav{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}button{font:inherit;font-weight:bold;min-height:56px;padding:12px;border:2px solid #fff;border-radius:14px;background:#075da8;color:white;cursor:pointer}button:focus-visible{outline:4px solid #ffdf38;outline-offset:3px}nav button:nth-child(2){background:#a51d30}nav button:nth-child(3){background:#ffdf38;color:#111}section{margin-top:24px;padding:16px;border:1px solid #8295a9;border-radius:16px}label{display:block;margin:12px 0}input{font:inherit}body.large{font-size:23px}body.classic h1{font-style:normal;text-shadow:none}small{display:block;margin:16px 0} [hidden]{display:none!important}
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KIS Social Studio</title><style>body{margin:0;background:#101722;color:white;font:18px system-ui}main,#native-lock{max-width:680px;margin:auto;padding:20px}h1{font-size:64px;color:#ffdf38;font-style:italic;margin:12px 0;text-shadow:4px 4px #d92739}header{border-bottom:5px solid #1688dc}nav{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}button{font:inherit;font-weight:bold;min-height:56px;padding:12px;border:2px solid #fff;border-radius:14px;background:#075da8;color:white;cursor:pointer}button:focus-visible{outline:4px solid #ffdf38;outline-offset:3px}nav button:nth-child(2){background:#a51d30}nav button:nth-child(3){background:#ffdf38;color:#111}section{margin-top:24px;padding:16px;border:1px solid #8295a9;border-radius:16px}label{display:block;margin:12px 0}input{font:inherit}body.large{font-size:23px}body.classic h1{font-style:normal;text-shadow:none}small{display:block;margin:16px 0} [hidden]{display:none!important}
 :root { color-scheme: dark; --bg:#101722; --text:#fff; --focus:#ffdf38; }
 body { background:var(--bg); color:var(--text); }
 input, textarea, select { max-width:100%; box-sizing:border-box; }
@@ -6,6 +6,7 @@ textarea { display:block; width:100%; font:inherit; }
 form button, #account-session button { margin:.5rem .25rem .25rem 0; }
 #message-list { overflow-wrap:anywhere; }
 #message-list li { white-space:pre-wrap; }
+#call-remote { display:block; max-width:100%; max-height:45vh; }
 body.light { color-scheme: light; --bg:#f7f9fc; --text:#101722; --focus:#174b99; }
 body.light h1 { color:#805000; text-shadow:none; }
 body.system { color-scheme: light dark; }
@@ -37,11 +38,11 @@ details button { margin:.5rem .25rem 0 0; }
   <select id="privacy-mode" aria-describedby="privacy-help">
     <option value="public">Public</option><option value="private">Privé</option><option value="ultra">Ultra privé</option>
   </select>
-  <p id="privacy-help">Les restrictions du mode et le socle mineurs restent cochés. Les réglages sont associés au compte après connexion. Face ID ou code nécessite une intégration native.</p>
+  <p id="privacy-help">Les restrictions du mode et le socle mineurs restent cochés. Les réglages sont associés au compte après connexion. Le verrouillage Face ID ou code se règle sur chaque appareil depuis la coque native.</p>
   <div id="privacy-options"></div>
   <p id="privacy-status" role="status"></p>
 </fieldset>
-<h3>Super Sécurité</h3><p>Les comptes de prétest utilisent le même socle de protection. Les contacts doivent être approuvés avant tout échange.</p><h3>Kis Verified</h3><p>Identité, Confiance, Excellence — certifications non actives.</p><button id="close">Fermer les paramètres</button></section><section aria-labelledby="account-heading">
+<button id="device-lock-setting" type="button" hidden>Activer Face ID ou le code de cet appareil</button><p id="device-lock-status" role="status" hidden></p><h3>Super Sécurité</h3><p>Les comptes de prétest utilisent le même socle de protection. Les contacts doivent être approuvés avant tout échange.</p><h3>Kis Verified</h3><p>Identité, Confiance, Excellence — certifications non actives.</p><button id="close">Fermer les paramètres</button></section><section aria-labelledby="account-heading">
   <h2 id="account-heading">Compte et messagerie</h2>
   <p id="account-status" role="status"></p>
   <form id="account-form">
@@ -56,13 +57,31 @@ details button { margin:.5rem .25rem 0 0; }
   <div id="account-session" hidden>
     <p>Compte connecté <strong id="account-name"></strong></p>
     <button type="button" id="logout">Déconnexion</button>
+    <h3>Âge et consentements</h3>
+    <p id="age-status" role="status"></p>
+    <form id="consent-form">
+      <label><input id="consent-chat" type="checkbox"> Autoriser les échanges avec mes contacts approuvés</label>
+      <label><input id="consent-music" type="checkbox"> Autoriser l’envoi volontaire d’un extrait à Kis York</label>
+      <button type="submit">Enregistrer mes consentements</button>
+    </form>
     <h3>Messagerie entre contacts approuvés</h3>
+    <p id="message-notice" role="status"></p>
     <button type="button" id="contacts-refresh">Actualiser les contacts</button>
     <label for="peer">Contact</label>
     <select id="peer"></select>
     <button type="button" id="read-thread" disabled>Actualiser la conversation</button>
     <button type="button" id="block-peer" disabled>Bloquer ce contact</button>
     <button type="button" id="older-messages" hidden>Messages précédents</button>
+    <section aria-labelledby="call-heading">
+      <h4 id="call-heading">Appels audio et vidéo</h4>
+      <p id="call-status" role="status"></p>
+      <button id="call-audio" type="button" disabled>Lancer un appel audio</button>
+      <button id="call-video" type="button" disabled>Lancer un appel vidéo</button>
+      <button id="accept-call" type="button" hidden>Accepter l’appel</button>
+      <button id="decline-call" type="button" hidden>Refuser l’appel</button>
+      <button id="end-call" type="button" hidden>Raccrocher</button>
+      <video id="call-remote" aria-label="Média reçu" controls playsinline hidden></video>
+    </section>
     <ol id="message-list" aria-label="Messages"></ol>
     <form id="send-form">
       <label for="message-text">Message texte</label>
@@ -71,7 +90,20 @@ details button { margin:.5rem .25rem 0 0; }
     </form>
   </div>
 </section>
-</main><script>
+<section id="york-recognition" aria-labelledby="york-heading" hidden>
+<h2 id="york-heading">Reconnaissance Kis York</h2>
+<p>Vous pouvez enregistrer jusqu’à dix secondes de son. L’extrait est transmis au service Kis York après votre consentement. Ce studio ne conserve pas d’historique de recherche.</p>
+<button id="start-york" type="button" disabled>Reconnaître un morceau</button>
+<button id="cancel-york" type="button" hidden>Annuler l’enregistrement</button>
+<p id="york-status" role="status"></p>
+</section>
+</main>
+<section id="native-lock" aria-labelledby="lock-title" hidden>
+  <h1 id="lock-title">KIS verrouillé</h1>
+  <button id="unlock-device" type="button">Déverrouiller</button>
+  <p id="lock-status" role="status"></p>
+</section>
+<script>
 'use strict';
 
 const modules = {
@@ -82,7 +114,7 @@ const modules = {
   flash: ['KIS Flash', 'Module à connecter.'],
   vibes: ['KIS Vibes', 'Module à connecter.'],
   discussions: ['KIS Discussions', 'Module à connecter.'],
-  york: ['Kis York', 'Le lecteur historique est disponible séparément.'],
+  york: ['Kis York', 'Reconnaissance musicale avec consentement et compte adulte attesté.'],
   chat: ['Kis Chat', 'Messagerie, vidéo et messages éphémères : services à connecter.'],
   call: ['Kis Call', 'Appels vidéo et chat pendant les appels : services à connecter.']
 };
@@ -227,6 +259,9 @@ el('theme').addEventListener('change', event => {
 document.querySelectorAll('[data-panel]').forEach(button => {
   button.addEventListener('click', () => {
     currentModule = button.dataset.panel;
+    el('york-recognition').hidden = currentModule !== 'york';
+    if (currentModule !== 'york') cancelYork();
+    else if (signedIn) void act(el('start-york'), refreshSafety);
     const [title, description] = modules[currentModule];
     el('heading').textContent = title;
     el('description').textContent = description;
@@ -281,6 +316,12 @@ function showAccount(account) {
   threadVersion++;
   signedIn = Boolean(account);
   confirmedPrivacy = account?.privacy ?? null;
+  messageCursor = null;
+  el('message-notice').textContent = '';
+  cancelYork();
+  closeMedia();
+  pendingCall = null;
+  renderSafety(account?.safety);
   el('account-form').hidden = signedIn;
   el('account-session').hidden = !signedIn;
   el('account-name').textContent = account?.handle ?? '';
@@ -310,13 +351,18 @@ async function refreshContacts() {
     el(id).disabled = peers.length === 0;
   }
   await loadThread();
+  void pollCalls();
+  void checkMessages();
 }
 
 async function loadThread(before) {
   const version = ++threadVersion;
   const peer = el('peer').value;
   const list = el('message-list');
-  if (!before) list.replaceChildren();
+  if (!before) {
+    list.replaceChildren();
+    el('message-notice').textContent = '';
+  }
   el('older-messages').hidden = true;
   if (!peer) return;
   const query = new URLSearchParams({peer});
@@ -372,13 +418,14 @@ el('account-form').addEventListener('submit', event => {
   });
 });
 el('logout').addEventListener('click', event => void act(event.currentTarget, async () => {
+  await endMedia('');
   await api('logout', 'POST');
   showAccount(null);
   el('handle').focus();
   accountStatus.textContent = 'Session fermée.';
 }));
 el('peer').addEventListener('change', event => void act(event.currentTarget, () => loadThread()));
-el('contacts-refresh').addEventListener('click', event => void act(event.currentTarget, refreshContacts));
+el('contacts-refresh').addEventListener('click', event => void act(event.currentTarget, async () => { await refreshSafety(); await refreshContacts(); }));
 el('read-thread').addEventListener('click', event => void act(event.currentTarget, () => loadThread()));
 el('older-messages').addEventListener('click', event => {
   const button = event.currentTarget;
@@ -400,6 +447,371 @@ el('block-peer').addEventListener('click', event => void act(event.currentTarget
   accountStatus.textContent = 'Contact bloqué.';
   await refreshContacts();
 }));
+
+let musicAllowed = false;
+let capture = null;
+
+function renderSafety(safety) {
+  const labels = {unknown:'Âge en attente de vérification',minor:'Compte mineur attesté',adult:'Compte adulte attesté'};
+  el('age-status').textContent = safety ? labels[safety.age] : '';
+  el('age-status').dataset.group = safety?.age ?? 'unknown';
+  if (!safety?.communications && mediaCall) void endMedia('Appel arrêté : consentement retiré.');
+  el('consent-chat').disabled = !(safety?.age === 'adult' || safety?.guardian);
+  el('consent-chat').checked = Boolean(safety?.communications);
+  el('consent-music').disabled = safety?.age !== 'adult';
+  el('consent-music').checked = Boolean(safety?.music);
+  musicAllowed = safety?.age === 'adult' && safety.music;
+  el('start-york').disabled = !musicAllowed || Boolean(capture);
+  if (!musicAllowed) cancelYork();
+}
+async function refreshSafety() {
+  const version = authVersion;
+  const {safety} = await api('me');
+  if (version === authVersion) renderSafety(safety);
+}
+el('consent-form').addEventListener('submit', event => {
+  event.preventDefault();
+  void act(event.currentTarget, async () => {
+    const safety = await api('consent','PUT',{
+      communications: el('consent-chat').checked,
+      music: el('consent-music').checked
+    });
+    renderSafety(safety);
+    accountStatus.textContent = 'Consentements enregistrés.';
+    await refreshContacts();
+  });
+});
+
+function cancelYork() {
+  if (!capture) return;
+  capture.controller.abort();
+  capture.stream?.getTracks().forEach(track => track.stop());
+}
+
+el('cancel-york').addEventListener('click',cancelYork);
+document.addEventListener('visibilitychange',() => { if (document.hidden) cancelYork(); });
+
+function recordClip(stream, signal) {
+  return new Promise((resolve,reject) => {
+    const recorder = new MediaRecorder(stream);
+    const chunks = [];
+    const timer = setTimeout(() => {
+      if (recorder.state === 'recording') recorder.stop();
+    },10000);
+    const finish = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort',abort);
+    };
+    const abort = () => {
+      finish();
+      if (recorder.state !== 'inactive') recorder.stop();
+      reject(signal.reason);
+    };
+    recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+    recorder.onstop = () => { finish(); resolve(new Blob(chunks,{type:recorder.mimeType})); };
+    recorder.onerror = () => { finish(); reject(Error('Enregistrement impossible.')); };
+    signal.addEventListener('abort',abort,{once:true});
+    try {
+      recorder.start();
+    } catch (error) {
+      finish();
+      reject(error);
+    }
+  });
+}
+
+el('start-york').addEventListener('click',async () => {
+  if (!musicAllowed || capture || mediaCall) return;
+  const status = el('york-status');
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    status.textContent = 'Microphone indisponible dans ce navigateur.';
+    return;
+  }
+  const controller = new AbortController();
+  const signal = controller.signal;
+  const deadline = setTimeout(() => controller.abort(new DOMException("Délai dépassé","TimeoutError")),45_000);
+  const session = {controller,stream:null};
+  capture = session;
+  el('start-york').disabled = true;
+  el('cancel-york').hidden = false;
+  status.textContent = 'Autorisez le microphone pour commencer.';
+  try {
+    const permission = navigator.mediaDevices.getUserMedia({audio:true}).then(stream => {
+      if (signal.aborted) stream.getTracks().forEach(track => track.stop());
+      else session.stream = stream;
+      return stream;
+    });
+    const cancellation = new Promise((_,reject) => {
+      signal.addEventListener('abort',() => reject(signal.reason),{once:true});
+    });
+    const stream = await Promise.race([permission,cancellation]);
+    signal.throwIfAborted();
+    status.textContent = 'Enregistrement de dix secondes.';
+    const clip = await Promise.race([recordClip(stream,signal),cancellation]);
+    stream.getTracks().forEach(track => track.stop());
+    signal.throwIfAborted();
+    if (!clip.size || clip.size > 2*1024*1024) throw Error('Extrait vide ou trop volumineux.');
+    status.textContent = 'Reconnaissance en cours.';
+    const response = await fetch('/api/music/identify',{
+      method:'POST',body:clip,signal,cache:'no-store',credentials:'same-origin'
+    });
+    const data = await response.json();
+    signal.throwIfAborted();
+    if (!response.ok) throw Error(data.error || 'Reconnaissance indisponible.');
+    status.textContent = data.match ? data.title + ' — ' + data.artist : 'Aucun morceau reconnu.';
+  } catch (error) {
+    status.textContent = error.name === 'TimeoutError' ? 'Délai de reconnaissance dépassé.' :
+      controller.signal.aborted ? 'Reconnaissance annulée.' :
+      error.name === 'NotAllowedError' ? 'Accès au microphone refusé.' :
+      signal.aborted ? 'Délai de reconnaissance dépassé.' : error.message;
+  } finally {
+    session.stream?.getTracks().forEach(track => track.stop());
+    clearTimeout(deadline);
+    capture = null;
+    el('start-york').disabled = !musicAllowed;
+    el('cancel-york').hidden = true;
+  }
+});
+
+let mediaCall = null;
+let mediaEpoch = 0;
+let polling = false;
+let pendingCall = null;
+
+function closeMedia() {
+  mediaEpoch++;
+  if (mediaCall) {
+    mediaCall.stream?.getTracks().forEach(track => track.stop());
+    mediaCall.connection?.close();
+  }
+  mediaCall = null;
+  el('call-remote').srcObject = null;
+  el('call-remote').hidden = true;
+  el('end-call').hidden = true;
+}
+
+function setCallNotice(text) {
+  const notice = el('call-status');
+  if (notice.textContent !== text) notice.textContent = text;
+}
+
+async function pollCalls() {
+  if (!signedIn || document.hidden || polling) return;
+  polling = true;
+  const version = authVersion;
+  try {
+    const {available,call} = await api('calls');
+    if (version !== authVersion) return;
+    const canCall = el('consent-chat').checked &&
+      el('age-status').dataset.group === 'adult' && Boolean(el('peer').value);
+    for (const id of ['call-audio','call-video']) el(id).disabled = !available || !canCall || Boolean(call || mediaCall);
+    if (!available) {
+      setCallNotice('Relais audio et vidéo indisponible.');
+      return;
+    }
+    pendingCall = call?.direction === 'incoming' && !call.answer && !mediaCall ? call : null;
+    el('accept-call').hidden = !pendingCall;
+    el('decline-call').hidden = !pendingCall;
+    if (pendingCall) {
+      const kind = pendingCall.kind === 'video' ? 'vidéo' : 'audio';
+      const hidden = settings.mode !== 'public' || settings.extra.includes('notifications');
+      setCallNotice('Appel ' + kind + ' entrant' + (hidden ? '.' : ' de ' + pendingCall.from + '.'));
+    }
+    if (mediaCall?.id && !call) {
+      closeMedia();
+      setCallNotice('Appel terminé.');
+    } else if (mediaCall?.id === call?.id && call?.answer && mediaCall.connection.signalingState === 'have-local-offer') {
+      await mediaCall.connection.setRemoteDescription({type:'answer',sdp:call.answer});
+    }
+  } catch {
+    if (version === authVersion) setCallNotice('État des appels indisponible.');
+  } finally {
+    polling = false;
+  }
+}
+
+async function awaitRelay(connection, epoch) {
+  const deadline = Date.now() + 12000;
+  while (connection.iceGatheringState !== 'complete') {
+    if (epoch !== mediaEpoch || Date.now() >= deadline) throw Error('Le relais ne répond pas.');
+    await new Promise(resolve => setTimeout(resolve,100));
+  }
+  const sdp = connection.localDescription?.sdp;
+  if (!sdp || !/\btyp relay\b/.test(sdp)) throw Error('Aucun relais média trouvé.');
+  return sdp;
+}
+
+async function startMedia(kind, incoming) {
+  if (mediaCall || !signedIn) return;
+  if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) {
+    setCallNotice('Audio ou vidéo indisponible sur cet appareil.');
+    return;
+  }
+  cancelYork();
+  const epoch = ++mediaEpoch;
+  const peer = incoming?.from ?? el('peer').value;
+  const state = {id:incoming?.id,connection:null,stream:null};
+  mediaCall = state;
+  el('end-call').hidden = false;
+  el('accept-call').hidden = true;
+  el('decline-call').hidden = true;
+  setCallNotice('Connexion au relais. Autorisez les appareils sélectionnés.');
+  let created;
+  try {
+    const configuration = await api('calls/ice');
+    if (epoch !== mediaEpoch) return;
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true,video:kind === 'video'});
+    if (epoch !== mediaEpoch) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    state.stream = stream;
+    const connection = new RTCPeerConnection(configuration);
+    state.connection = connection;
+    for (const track of stream.getTracks()) connection.addTrack(track,stream);
+    connection.addEventListener('track', event => {
+      if (epoch !== mediaEpoch) return;
+      const remote = event.streams[0] ?? new MediaStream([event.track]);
+      const element = el('call-remote');
+      element.srcObject = remote;
+      element.hidden = false;
+      void element.play().catch(() => setCallNotice('Touchez Lecture pour activer le média.'));
+    });
+    connection.addEventListener('connectionstatechange', () => {
+      if (epoch !== mediaEpoch) return;
+      if (connection.connectionState === 'connected') setCallNotice('Appel connecté.');
+      if (connection.connectionState === 'failed') void endMedia('Connexion média interrompue.');
+    });
+    if (incoming) {
+      await connection.setRemoteDescription({type:'offer',sdp:incoming.offer});
+      await connection.setLocalDescription(await connection.createAnswer());
+    } else {
+      await connection.setLocalDescription(await connection.createOffer());
+    }
+    const sdp = await awaitRelay(connection,epoch);
+    if (epoch !== mediaEpoch) return;
+    if (incoming) {
+      await api('calls','POST',{action:'answer',id:incoming.id,sdp});
+    } else {
+      ({id:created} = await api('calls','POST',{action:'offer',peer,kind,sdp}));
+      if (epoch !== mediaEpoch) {
+        await api('calls','POST',{action:'end',id:created});
+        return;
+      }
+      state.id = created;
+    }
+    if (epoch === mediaEpoch) setCallNotice(incoming ? 'Connexion en cours.' : 'En attente de la réponse.');
+  } catch (error) {
+    if (epoch === mediaEpoch) await endMedia(error.name === 'NotAllowedError' ? 'Permission média refusée.' : error.message);
+  }
+}
+
+async function endMedia(text) {
+  const id = mediaCall?.id ?? pendingCall?.id;
+  closeMedia();
+  pendingCall = null;
+  el('accept-call').hidden = true;
+  el('decline-call').hidden = true;
+  setCallNotice(text);
+  if (signedIn && id) {
+    try { await api('calls','POST',{action:'end',id}); } catch {}
+  }
+}
+el('call-audio').addEventListener('click',() => void startMedia('audio'));
+el('call-video').addEventListener('click',() => void startMedia('video'));
+el('accept-call').addEventListener('click',() => { if (pendingCall) void startMedia(pendingCall.kind,pendingCall); });
+el('decline-call').addEventListener('click',() => void endMedia('Appel refusé.'));
+el('end-call').addEventListener('click',() => void endMedia('Appel terminé.'));
+let messageCursor = null;
+let checkingMessages = false;
+async function checkMessages() {
+  if (!signedIn || document.hidden || checkingMessages) return;
+  checkingMessages = true;
+  const version = authVersion;
+  try {
+    const {latest,count} = await api('notifications?after=' + (messageCursor ?? 0));
+    if (version !== authVersion) return;
+    if (messageCursor !== null && count > 0) {
+      el('message-notice').textContent = count === 1 ? 'Un nouveau message.' : count + ' nouveaux messages.';
+    }
+    messageCursor = latest;
+  } catch {
+    // The conversation and its explicit refresh remain available.
+  } finally {
+    checkingMessages = false;
+  }
+}
+setInterval(() => { void pollCalls(); void checkMessages(); },3000);
+document.addEventListener('visibilitychange',() => {
+  if (document.hidden && mediaCall) void endMedia('Appel arrêté en arrière-plan.');
+});
+
+const nativeBridge = window.Capacitor;
+const deviceLockKey = 'kis-native-device-lock-v1';
+const lockPanel = el('native-lock');
+let localLock = false;
+let unlockBusy = false;
+
+function setLocked(locked) {
+  lockPanel.hidden = !locked;
+  document.querySelector('main').hidden = locked;
+  if (locked) {
+    cancelYork();
+    if (mediaCall) void endMedia('Appel arrêté : application verrouillée.');
+    el('unlock-device').focus();
+  } else {
+    (el('preferences').hidden ? el('settings') : el('device-lock-setting')).focus();
+  }
+}
+async function verifyDevice() {
+  const state = await nativeBridge.nativePromise('BiometricAuthNative','checkBiometry',{});
+  if (!state.deviceIsSecure) throw Error('Configurez Face ID ou un code dans les réglages de l’appareil.');
+  await nativeBridge.nativePromise('BiometricAuthNative','authenticate',{
+    reason:'Déverrouiller KIS Social Studio',allowDeviceCredential:true,
+    androidTitle:'Déverrouiller KIS',androidConfirmationRequired:true
+  });
+}
+if (nativeBridge?.isNativePlatform?.() && typeof nativeBridge.nativePromise === 'function') {
+  el('device-lock-setting').hidden = false;
+  try { localLock = localStorage.getItem(deviceLockKey) === 'enabled'; } catch {}
+  const setting = el('device-lock-setting');
+  function labelLock() {
+    setting.textContent = localLock ? 'Désactiver le verrouillage de cet appareil' :
+      'Activer Face ID ou le code de cet appareil';
+    setting.setAttribute('aria-pressed',String(localLock));
+  }
+  labelLock();
+  if (localLock) setLocked(true);
+  setting.addEventListener('click',() => void act(setting,async () => {
+    const status = el('device-lock-status');
+    status.hidden = false;
+    try {
+      const next = !localLock;
+      await verifyDevice();
+      localStorage.setItem(deviceLockKey,next ? 'enabled' : 'disabled');
+      localLock = next;
+      labelLock();
+      status.textContent = localLock ? 'Verrouillage activé.' : 'Verrouillage désactivé.';
+      if (localLock) setLocked(true);
+    } catch (error) {
+      status.textContent = error.message || 'Authentification de l’appareil indisponible.';
+    }
+  }));
+  el('unlock-device').addEventListener('click',async () => {
+    if (unlockBusy) return;
+    unlockBusy = true;
+    el('lock-status').textContent = '';
+    try {
+      await verifyDevice();
+      setLocked(false);
+    } catch (error) {
+      el('lock-status').textContent = error.message || 'Le studio reste verrouillé.';
+    } finally {
+      unlockBusy = false;
+    }
+  });
+  document.addEventListener('visibilitychange',() => { if (localLock && document.hidden) setLocked(true); });
+}
 
 renderTheme();
 renderPrivacy();

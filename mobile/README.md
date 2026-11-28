@@ -11,3 +11,5 @@ Consigner le modèle, la version iOS ou iPadOS, la version Safari, l’URL de pr
 Sur Safari, ouvrir la préproduction HTTPS KIS depuis deux sessions isolées. Créer deux comptes fictifs et faire approuver le contact par l’opérateur. Vérifier les trois modes sur les huit entrées, la persistance après reconnexion, l’envoi et la réception de texte, le signalement et l’arrêt des échanges après blocage. Vérifier qu’un troisième compte ne peut pas accéder à la conversation.
 
 La coque native embarque l’interface locale. Elle reste à raccorder à une origine HTTPS KIS approuvée pour la messagerie et les comptes, dont l’API exige la même origine. Les huit pictogrammes officiels restent à importer depuis leurs fichiers d’origine.
+
+Le verrouillage local utilise le module natif BiometricAuth. Sur iPhone ou iPad vérifier l’enrôlement, le refus, l’annulation, le code système et le retour depuis l’arrière-plan. Sur Android vérifier la biométrie et le code, avec et sans verrouillage système configuré. Aucun code n’est saisi ni stocké par l’interface web. L’archive contient des projets Debug à compiler sur les postes équipés.

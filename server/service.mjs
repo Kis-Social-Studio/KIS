@@ -1,5 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { createCalls } from './calls.mjs';
+import { prepareEncryption } from './encryption.mjs';
 import { promisify } from 'node:util';
 
 const derive = promisify(scrypt);
@@ -26,8 +28,7 @@ function ensure(condition, status, message) {
 async function passwordKey(password, salt) {
   return derive(password, salt, 64, {N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024});
 }
-async function readJson(request) {
-  ensure(request.headers.get('content-type')?.split(';')[0].trim() === 'application/json', 415, 'JSON requis.');
+async function readBody(request, limit) {
   ensure(request.body, 400, 'Corps manquant.');
   const reader = request.body.getReader();
   const chunks = [];
@@ -36,15 +37,20 @@ async function readJson(request) {
     const {done, value} = await reader.read();
     if (done) break;
     size += value.length;
-    if (size > bodyLimit) {
+    if (size > limit) {
       await reader.cancel();
       throw new HttpError(413, 'Requête trop volumineuse.');
     }
     chunks.push(value);
   }
+  return Buffer.concat(chunks);
+}
+async function readJson(request, limit = bodyLimit) {
+  ensure(request.headers.get('content-type')?.split(';')[0].trim() === 'application/json',415,'JSON requis.');
+  const body = await readBody(request,limit);
   let value;
   try {
-    value = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    value = JSON.parse(body.toString('utf8'));
   } catch {
     throw new HttpError(400, 'JSON invalide.');
   }
@@ -63,7 +69,7 @@ function json(value, status = 200, headers = {}) {
   });
 }
 
-export function openService({filename, origin, now = Date.now, maxAuthPerMinute = 24}) {
+export function openService({filename, origin, keyHex, recognize, turnUrl, turnSecret, now = Date.now, maxAuthPerMinute = 24}) {
   const url = new URL(origin);
   ensure(url.origin === origin && (url.protocol === 'https:' ||
     (url.protocol === 'http:' && url.hostname === '127.0.0.1')), 500, 'Origine HTTPS ou locale requise.');
@@ -72,11 +78,22 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
     PRAGMA foreign_keys = ON;
     PRAGMA journal_mode = WAL;
     PRAGMA busy_timeout = 5000;
+    CREATE TABLE IF NOT EXISTS encryption_meta (
+      id INTEGER PRIMARY KEY CHECK(id=1), sealed TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS accounts (
       id INTEGER PRIMARY KEY, handle TEXT UNIQUE NOT NULL,
       salt TEXT NOT NULL, password TEXT NOT NULL,
       mode TEXT NOT NULL DEFAULT 'private' CHECK(mode IN ('public','private','ultra')),
       extra TEXT NOT NULL DEFAULT '[]'
+    );
+    CREATE TABLE IF NOT EXISTS safety (
+      account INTEGER PRIMARY KEY REFERENCES accounts(id),
+      age TEXT NOT NULL DEFAULT 'unknown' CHECK(age IN ('unknown','minor','adult')),
+      guardian INTEGER NOT NULL DEFAULT 0 CHECK(guardian IN (0,1)),
+      communications INTEGER NOT NULL DEFAULT 0 CHECK(communications IN (0,1)),
+      music INTEGER NOT NULL DEFAULT 0 CHECK(music IN (0,1)),
+      attested INTEGER, attestation TEXT, consent_updated INTEGER
     );
     CREATE TABLE IF NOT EXISTS sessions (
       token TEXT PRIMARY KEY, account INTEGER NOT NULL REFERENCES accounts(id), expires INTEGER NOT NULL
@@ -85,6 +102,10 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
     CREATE TABLE IF NOT EXISTS contacts (
       low INTEGER NOT NULL REFERENCES accounts(id), high INTEGER NOT NULL REFERENCES accounts(id),
       CHECK(low < high), PRIMARY KEY(low,high)
+    );
+    CREATE TABLE IF NOT EXISTS contact_approvals (
+      low INTEGER NOT NULL, high INTEGER NOT NULL, low_attestation TEXT NOT NULL, high_attestation TEXT NOT NULL,
+      PRIMARY KEY(low,high), FOREIGN KEY(low,high) REFERENCES contacts(low,high)
     );
     CREATE TABLE IF NOT EXISTS blocks (
       owner INTEGER NOT NULL REFERENCES accounts(id), peer INTEGER NOT NULL REFERENCES accounts(id),
@@ -95,11 +116,19 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
       recipient INTEGER NOT NULL REFERENCES accounts(id), text TEXT NOT NULL, created INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS messages_thread ON messages(sender,recipient,id);
+    CREATE INDEX IF NOT EXISTS messages_recipient ON messages(recipient,id);
     CREATE TABLE IF NOT EXISTS reports (
       reporter INTEGER NOT NULL REFERENCES accounts(id), message INTEGER NOT NULL REFERENCES messages(id),
       created INTEGER NOT NULL, PRIMARY KEY(reporter,message)
     );
   `);
+  let encryption;
+  try {
+    encryption = prepareEncryption(db,keyHex,filename);
+  } catch (error) {
+    db.close();
+    throw error;
+  }
   const q = sql => db.prepare(sql);
   const second = () => Math.floor(now() / 1000);
   const byHandle = q('SELECT * FROM accounts WHERE handle=?');
@@ -113,17 +142,65 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
   let authWindow = -1;
   let authCount = 0;
   let authActive = 0;
+  let musicActive = 0;
+  const musicQuota = new Map();
   const cookie = (token, age) => `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}` +
     (url.protocol === 'https:' ? '; Secure' : '');
 
+  const findSafety = q('SELECT age,guardian,communications,music,attestation FROM safety WHERE account=?');
+  const approval = q(`
+    SELECT 1 FROM contact_approvals c JOIN safety a ON a.account=c.low JOIN safety b ON b.account=c.high
+    WHERE c.low=? AND c.high=? AND c.low_attestation=a.attestation AND c.high_attestation=b.attestation
+  `);
+  function safetyFor(id) {
+    const row = findSafety.get(id);
+    return {
+      age: row?.age ?? 'unknown',
+      guardian: Boolean(row?.guardian),
+      communications: Boolean(row?.communications),
+      music: Boolean(row?.music)
+    };
+  }
+  function permitsCommunication(a, b) {
+    const first = safetyFor(a);
+    const second = safetyFor(b);
+    return first.age !== 'unknown' && first.age === second.age &&
+      first.communications && second.communications &&
+      (first.age === 'adult' || (first.guardian && second.guardian));
+  }
+  const callEligible = (a,b) => safetyFor(a).age === 'adult' && allowed(a,b);
+  const calls = createCalls({turnUrl,turnSecret,second,eligible:callEligible});
+  function attestAge(handle, age, guardian = false) {
+    const account = byHandle.get(normalize(handle));
+    ensure(account && ['adult','minor','unknown'].includes(age) && (!guardian || age === 'minor'),
+      400, 'Attestation invalide.');
+    q(`
+      INSERT INTO safety(account,age,guardian,attested,attestation) VALUES(?,?,?,?,?)
+      ON CONFLICT(account) DO UPDATE SET age=excluded.age,guardian=excluded.guardian,
+      attested=excluded.attested,attestation=excluded.attestation,communications=0,music=0,consent_updated=NULL
+    `).run(account.id,age,Number(guardian),second(),randomBytes(16).toString('hex'));
+  }
   function allowContact(left, right) {
     const a = byHandle.get(normalize(left));
     const b = byHandle.get(normalize(right));
     ensure(a && b && a.id !== b.id, 400, 'Deux comptes distincts sont requis.');
-    q('INSERT OR IGNORE INTO contacts(low,high) VALUES(?,?)').run(...pair(a.id,b.id));
+    const [low,high] = pair(a.id,b.id);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      ensure(permitsCommunication(low,high),403,'Âge ou consentement à vérifier.');
+      q('INSERT OR IGNORE INTO contacts(low,high) VALUES(?,?)').run(low,high);
+      q(`
+        INSERT INTO contact_approvals(low,high,low_attestation,high_attestation) VALUES(?,?,?,?)
+        ON CONFLICT(low,high) DO UPDATE SET low_attestation=excluded.low_attestation,high_attestation=excluded.high_attestation
+      `).run(low,high,findSafety.get(low).attestation,findSafety.get(high).attestation);
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
   }
   function allowed(a, b) {
-    return pairExists.get(...pair(a,b)) && !blockExists.get(a,b,b,a);
+    return permitsCommunication(a,b) && approval.get(...pair(a,b)) && !blockExists.get(a,b,b,a);
   }
   function peerFor(me, handle) {
     const peer = byHandle.get(normalize(handle));
@@ -163,7 +240,7 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
         .run(digest(token), account.id, second() + sessionSeconds);
       const previous = request.headers.get('cookie')?.match(/(?:^|;\s*)kis_session=([a-f0-9]{64})(?:;|$)/)?.[1];
       if (previous) q('DELETE FROM sessions WHERE token=?').run(digest(previous));
-      return json({handle, privacy: privacy(account)}, register ? 201 : 200, {'set-cookie': cookie(token, sessionSeconds)});
+      return json({handle, privacy: privacy(account), safety:safetyFor(account.id)}, register ? 201 : 200, {'set-cookie': cookie(token, sessionSeconds)});
     } finally {
       authActive--;
     }
@@ -184,8 +261,8 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
       const account = token && session.get(digest(token), second());
       ensure(account, 401, 'Connexion requise.');
       const me = account.id;
-      const authenticatedBody = async () => {
-        const data = await readJson(request);
+      const authenticatedBody = async limit => {
+        const data = await readJson(request,limit);
         ensure(session.get(digest(token), second()), 401, 'Connexion requise.');
         return data;
       };
@@ -194,7 +271,71 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
           q('DELETE FROM sessions WHERE token=?').run(digest(token));
           return json({}, 200, {'set-cookie': cookie('', 0)});
         case 'GET /api/me':
-          return json({handle: account.handle, privacy: privacy(account)});
+          return json({handle: account.handle, privacy: privacy(account), safety:safetyFor(me)});
+        case 'PUT /api/consent': {
+          const {communications,music} = await authenticatedBody();
+          const current = safetyFor(me);
+          ensure(typeof communications === 'boolean' && typeof music === 'boolean',400,'Consentement invalide.');
+          ensure(!communications || current.age === 'adult' || (current.age === 'minor' && current.guardian),
+            403,'Autorisation de communication requise.');
+          ensure(!music || current.age === 'adult',403,'Reconnaissance réservée aux comptes adultes attestés.');
+          q(`
+            INSERT INTO safety(account,communications,music,consent_updated) VALUES(?,?,?,?)
+            ON CONFLICT(account) DO UPDATE SET communications=excluded.communications,
+            music=excluded.music,consent_updated=excluded.consent_updated
+          `).run(me,Number(communications),Number(music),second());
+          return json(safetyFor(me));
+        }
+        case 'GET /api/notifications': {
+          const after = Number(searchParams.get('after') ?? 0);
+          ensure(Number.isSafeInteger(after) && after >= 0,400,'Curseur invalide.');
+          const latest = q('SELECT COALESCE(MAX(id),0) AS id FROM messages WHERE recipient=?').get(me).id;
+          const rows = q(`
+            SELECT sender,COUNT(*) AS total FROM messages WHERE recipient=? AND id>?
+            GROUP BY sender
+          `).all(me,after);
+          const count = rows.filter(row => allowed(me,row.sender)).reduce((sum,row) => sum + row.total,0);
+          return json({latest,count});
+        }
+        case 'GET /api/calls': {
+          const {body} = calls.process('status',account);
+          return json(body);
+        }
+        case 'GET /api/calls/ice': {
+          ensure(safetyFor(me).age === 'adult' && safetyFor(me).communications,403,'Appels réservés aux comptes adultes ayant consenti.');
+          const result = calls.process('ice',account);
+          return json(result.body,result.status);
+        }
+        case 'POST /api/calls': {
+          const {action,id,kind,sdp,peer} = await authenticatedBody(32_768);
+          ensure(['offer','answer','end'].includes(action),400,'Action invalide.');
+          const target = action === 'offer' ? peerFor(account,peer) : null;
+          const result = calls.process(action,account,{id,kind,sdp},target);
+          return json(result.body,result.status);
+        }
+        case 'POST /api/music/identify': {
+          ensure(recognize,503,'Reconnaissance musicale non configurée.');
+          const eligibility = safetyFor(me);
+          ensure(eligibility.age === 'adult' && eligibility.music,403,'Consentement musical requis.');
+          const mime = request.headers.get('content-type')?.split(';')[0].trim();
+          ensure(['audio/webm','audio/mp4','audio/ogg','audio/wav','audio/mpeg'].includes(mime),415,'Format audio non pris en charge.');
+          const clip = await readBody(request,2*1024*1024);
+          ensure(clip.length > 0,400,'Extrait audio manquant.');
+          const current = safetyFor(me);
+          ensure(session.get(digest(token),second()) && current.age === 'adult' && current.music,403,'Consentement musical requis.');
+          const stamp = second();
+          for (const [id, time] of musicQuota) if (time <= stamp-60) musicQuota.delete(id);
+          ensure(!musicQuota.has(me) && musicActive < 2,429,'Réessayez dans un instant.');
+          musicQuota.set(me,stamp);
+          musicActive++;
+          try {
+            return json(await recognize(clip,mime,request.signal));
+          } catch {
+            throw new HttpError(502,'Service de reconnaissance indisponible.');
+          } finally {
+            musicActive--;
+          }
+        }
         case 'PUT /api/privacy': {
           const {mode, requested} = await authenticatedBody();
           ensure(typeof mode === 'string' && Object.hasOwn(modes, mode) &&
@@ -206,24 +347,24 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
         }
         case 'GET /api/contacts': {
           const rows = q(`
-            SELECT a.handle FROM contacts c JOIN accounts a
+            SELECT a.id,a.handle FROM contacts c JOIN accounts a
             ON a.id=CASE WHEN c.low=? THEN c.high ELSE c.low END
             WHERE (c.low=? OR c.high=?) AND NOT EXISTS(
               SELECT 1 FROM blocks b WHERE (b.owner=? AND b.peer=a.id) OR (b.owner=a.id AND b.peer=?)
             ) ORDER BY a.handle LIMIT 100
           `).all(me,me,me,me,me);
-          return json(rows.map(row => row.handle));
+          return json(rows.filter(row => allowed(me,row.id)).map(row => row.handle));
         }
         case 'GET /api/messages': {
           const peer = peerFor(account, searchParams.get('peer'));
           const before = Number(searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
           ensure(Number.isSafeInteger(before) && before > 0, 400, 'Curseur invalide.');
           const rows = q(`
-            SELECT id, sender=? AS mine, text, created FROM messages
+            SELECT id,sender,recipient,sender=? AS mine,text,created FROM messages
             WHERE ((sender=? AND recipient=?) OR (sender=? AND recipient=?)) AND id<?
             ORDER BY id DESC LIMIT 51
           `).all(me,me,peer.id,peer.id,me,before);
-          return json({messages: rows.slice(0,50).reverse(), next: rows.length === 51 ? rows[49].id : null});
+          return json({messages: rows.slice(0,50).reverse().map(row => ({id:row.id,mine:row.mine,text:encryption.readMessage(row),created:row.created})), next: rows.length === 51 ? rows[49].id : null});
         }
         case 'POST /api/messages': {
           const {peer: handle, text} = await authenticatedBody();
@@ -232,9 +373,20 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
             !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(text), 400, 'Message invalide.');
           const recent = q('SELECT COUNT(*) AS total FROM messages WHERE sender=? AND created>?').get(me,second()-60);
           ensure(recent.total < 20, 429, 'Trop de messages.');
-          const {lastInsertRowid} = q('INSERT INTO messages(sender,recipient,text,created) VALUES(?,?,?,?)')
-            .run(me,peer.id,text.trim(),second());
-          return json({id: lastInsertRowid}, 201);
+          const created = second();
+          db.exec('BEGIN IMMEDIATE');
+          try {
+            ensure(allowed(me,peer.id),404,'Contact indisponible.');
+            const {lastInsertRowid:id} = q('INSERT INTO messages(sender,recipient,text,created) VALUES(?,?,?,?)')
+              .run(me,peer.id,'',created);
+            const sealed = encryption.sealMessage(id,me,peer.id,created,text.trim());
+            q('UPDATE messages SET text=? WHERE id=?').run(sealed,id);
+            db.exec('COMMIT');
+            return json({id},201);
+          } catch (error) {
+            db.exec('ROLLBACK');
+            throw error;
+          }
         }
         case 'POST /api/block': {
           const {peer: handle} = await authenticatedBody();
@@ -261,11 +413,11 @@ export function openService({filename, origin, now = Date.now, maxAuthPerMinute 
   }
   function listReports() {
     return q(`
-      SELECT r.message AS id, a.handle AS reporter, b.handle AS sender, m.text, r.created
+      SELECT r.message AS id,a.handle AS reporter,b.handle AS senderHandle,m.sender,m.recipient,m.text,m.created,r.created AS reported
       FROM reports r JOIN accounts a ON a.id=r.reporter
       JOIN messages m ON m.id=r.message JOIN accounts b ON b.id=m.sender
       ORDER BY r.created DESC LIMIT 100
-    `).all();
+    `).all().map(row => ({id:row.id,reporter:row.reporter,sender:row.senderHandle,text:encryption.readMessage(row),created:row.reported}));
   }
-  return {handle, allowContact, listReports, close: () => db.close()};
+  return {handle, allowContact, attestAge, listReports, close: () => db.close()};
 }
